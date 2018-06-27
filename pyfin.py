@@ -6,9 +6,9 @@ Created on Sat Jun  2 16:53:46 2018
 @author: herman
 """
 ### TODO:
-#  Maak seker dat kapitaalwins berekening sin maak.
 #  Bou inflasie in
 #  Bou bounds in
+#  Maak aftredejaar RA reg. 
 #  Bou spreiblad vermoë in
 #  fooie?
 #  Bou plan evalueringsvermoë in (sonder optimering)
@@ -209,12 +209,12 @@ class Portfolio(object):
         '''
         contr = np.zeros_like(ind[1:]) #  exclude RA payout fraction (first item in arr)
         ra_contr = ind[1:, :len(self.ra_list)].sum(axis=1)
-        tax = np.zeros_like(ra_contr)
-        for i in range(1, len(ind)):
+        tax = np.zeros(len(contr))
+        for i in range(1, len(contr)):
             tax[i] = self.incomeTax(self.taxable_ibt - ra_contr[i])
         savable_income = self.taxable_ibt - ra_contr - tax - self.expenses
-        contr[:, :len(self.ra_list)] = self.taxable_ibt*ind[:, :len(self.ra_list)]
-        contr[:, len(self.ra_list):] = savable_income[:, None]*ind[:, len(self.ra_list):]
+        contr[:, :len(self.ra_list)] = self.taxable_ibt*np.array(ind[1:, :len(self.ra_list)])
+        contr[:, len(self.ra_list):] = savable_income[:, None]*np.array(ind[1:, len(self.ra_list):])
         return contr
 
         
@@ -238,7 +238,9 @@ class Portfolio(object):
                         
         '''
         #  Reshape array:
+        #print('individual shape', np.array(individual).shape)
         scenario = self.fractionsToRands(self.reshape(individual))
+        #print('scenario shape', scenario.shape)
         ra_payout_frac = individual[0]
         self.contr.loc[:, self.contr.columns] = scenario
         #self.withdrawals.loc[:, self.withdrawals.columns] = scenario[:, self.size:self.size*2]
@@ -246,10 +248,11 @@ class Portfolio(object):
             self.investments[i].calculateOptimalWithdrawal(self.contr.loc[:, count],
                                                             self.strategy,
                                                             ra_payout_frac)
-        
+        #print('before calculate')
         self.calculate()
         
         #  Penalise IAT==0 in any year
+        #print('before penalty')
         self.df.loc[self.df['iat']==0, 'iat'] = -self.taxable_ibt*100
         #  Penalise algorithm by the difference between max and min iat during retirement:
         
@@ -264,14 +267,15 @@ class Portfolio(object):
         #return round(-self.df.loc[self.retirement_date:, 'iat'].sum() + penalty_chebychev + penalty_oversaved + penalty_left_over + penalty_stdev, 2)
        
         if self.strategy == 'optimal':
-            saved_surplus = self.df.loc[:self.last_working_date, 'iat'] - self.expenses - self.df.loc[:self.last_working_date, 'contr_total']
-            penalty_oversaved = saved_surplus.loc[saved_surplus<0].sum()**2
-
-            return round(-self.df.loc[self.retirement_date:, 'iat'].mean() + penalty_oversaved, 2)
+            #print('before saved_surplus')
+            #saved_surplus = self.df.loc[:self.last_working_date, 'iat'] - self.expenses - self.df.loc[:self.last_working_date, 'contr_total']
+            #penalty_oversaved = saved_surplus.loc[saved_surplus<0].sum()**2
+            #print('after saved surplus')
+            return round(-self.df.loc[self.retirement_date:, 'iat'].mean(), 2) #+ penalty_oversaved, 2)
         elif self.strategy == 'safe':
-            saved_surplus = self.df.loc[:self.last_working_date, 'iat'] - self.expenses - self.df.loc[:self.last_working_date, 'contr_total']
-            penalty_oversaved = saved_surplus.loc[saved_surplus<0].sum()**2
-            return round(-self.df.loc[self.retirement_date:, 'iat'].mean() + penalty_oversaved, 2)
+            #saved_surplus = self.df.loc[:self.last_working_date, 'iat'] - self.expenses - self.df.loc[:self.last_working_date, 'contr_total']
+            #penalty_oversaved = saved_surplus.loc[saved_surplus<0].sum()**2
+            return round(-self.df.loc[self.retirement_date:, 'iat'].mean(), 2) #+ penalty_oversaved, 2)
 
     def calculate(self):
         
@@ -333,6 +337,7 @@ class Portfolio(object):
         self.df['iat'] = self.df['iat'] + self.df['taxable_ibt'] - self.df['it']
         
     def totalTax(self, s):
+        
         '''
         Calculates total income tax.
         ------
@@ -342,6 +347,7 @@ class Portfolio(object):
         Returns:
         tax:                float. tax payable in a particular year
         '''
+        
         age = (s.name - pd.Timestamp(self.dob)).days/365.25
         taxable_income = 0
         if s.name < self.retirement_date:
@@ -485,7 +491,10 @@ class Portfolio(object):
         Genetic Algorithm Fitness function. Just a wrapper casting the result of
         the objective function as a tuple, which is what DEAP needs.
         '''
-        return self.objective(scenario_1d),
+        ret_tuple = self.objective(scenario_1d),
+        #print('after objective')
+        #print(ret_tuple)
+        return ret_tuple
         
     def initIndividual(self, icls, content):
         
@@ -501,10 +510,12 @@ class Portfolio(object):
             ra = np.random.dirichlet(factor*np.ones(len(self.ra_list)))*np.random.beta(1, 3.9)
             #  Generate other allocations to sum to one:
             others = np.random.dirichlet(factor*np.ones(self.size - len(self.ra_list)))
-            contr[i, :] = np.concatenate([ra_payout, ra, others])
+            contr[i, :] = np.concatenate([ra, others])
         #return self.convertPercentagesToRands(contr)
         #return np.array([self.convertPercentagesToRands(i) for i in contr])
-        return np.array(contr)
+        reshaped = contr.reshape(contr.size)
+        
+        return np.insert(reshaped, 0, ra_payout)
 
     def randomConstantIndividual(self, factor):
         
@@ -518,7 +529,6 @@ class Portfolio(object):
                     numbers (>10), allocations will be about equal.
         '''
         ra_payout = np.random.random()*0.3
-
         contr = np.zeros([1 + self.number_working_years + self.number_retirement_years, self.size])
         #ra = np.random.dirichlet(factor*np.ones(len(self.ra_list)))*np.random.triangular(0, 0.275, 0.5)
         ra = np.random.dirichlet(factor*np.ones(len(self.ra_list)))*np.random.beta(1, 3.9)
@@ -527,33 +537,64 @@ class Portfolio(object):
         plan = np.concatenate([ra, others])
         contr = np.array([plan if i < self.number_working_years else np.zeros(self.size) for i in range(len(contr))])
         #contr[:self.number_working_years, :] = np.array([self.convertPercentagesToRands(a) for i in range(self.number_working_years)])
-        return np.concatenate([ra_payout, np.array(contr)])
+        return np.insert(np.array(contr), 0, ra_payout)
         
     
     def initPopulation(self, pcls, ind_init):
         
         ind_list = [np.ones([self.number_working_years,
                              self.size]) for i in range(self.pop_size)]
-        
         ind_list=[]
-        for j in np.geomspace(1/100, 100, 30):            
+        for j in np.geomspace(1/20, 100, 30):            
             contr = self.randomIndividual(j)
             ind_list += [contr.reshape(contr.size)]            
         
-        for j in np.geomspace(1/100, 100, 30):            
+        for j in np.geomspace(1/20, 100, 30):            
             contr = self.randomConstantIndividual(j)
             ind_list += [contr.reshape(contr.size)]
             
         #  Equally divided portions:
-        contr = np.zeros([self.number_working_years + self.number_retirement_years, self.size])        
+        contr = np.zeros([self.number_working_years + self.number_retirement_years + 1, self.size])        
         for i in range(self.number_working_years):
             contr[i, :] = self.savable_income/self.size*np.array([1]*self.size)
                         
-        ind_list += [np.concatenate([np.random.random()*0.3,
-                                     contr.reshape(contr.size)])]
+        ind_list += [np.insert(contr.reshape(contr.size),
+                               0,
+                               np.random.random()*0.3)]
         
         self.ind_list = ind_list
         return (pcls(ind_init(i) for i in ind_list))
+    
+    def checkBounds(self):
+        
+        '''
+        Checks if asset allocations are still within bounds, and corrects
+        if need be.
+        '''
+        def decorator(func):
+
+            def wrapper(*args, **kwargs):
+                offspring = func(*args, **kwargs)
+                for child in offspring:
+                    #print('in decorator, ind shape:', np.array(child).shape)
+                    ind = self.reshape(child)
+                    #print('ind shape', ind.shape)
+                    ras = ind[:, :len(self.ra_list)]
+                    others = ind[:, len(self.ra_list):]
+                    if ras.sum(axis=1).any() > 0.275:
+                        for i in range(len(ras)):
+                            if ras[i, :].sum() > 0.275: # normalize
+                                ras[i, :] = 0.275*ras[i, :]/ras[i, :].sum()
+                    others[others==0] = 0.01
+                    others = others/others.sum(axis=1)[:, None] # normalize
+                    ra_payout = np.clip(child[0], 0, 0.3)
+                    ind[:, :len(self.ra_list)] = ras
+                    ind[:, len(self.ra_list):] = others  
+                    child = creator.Individual(np.insert(ind.reshape(ind.size), 0, ra_payout)),
+                #print('ending checkbounds')
+                return offspring
+            return wrapper
+        return decorator
         
     def GA(self):
         
@@ -561,8 +602,8 @@ class Portfolio(object):
         creator.create("Individual", list, fitness=creator.FitnessMin)
         
         toolbox = base.Toolbox()
-        pool = multiprocessing.Pool()
-        toolbox.register("map", pool.map)
+        #pool = multiprocessing.Pool()
+        #toolbox.register("map", pool.map)
         toolbox.register("individual_guess", self.initIndividual, creator.Individual)
         toolbox.register("population_guess", self.initPopulation, list, toolbox.individual_guess)
         
@@ -572,9 +613,10 @@ class Portfolio(object):
         toolbox.register("mate", tools.cxOnePoint)
         toolbox.register("mutate", self.mutatePyfin, indpb=1, number_changed=3)
         toolbox.register("select", tools.selTournament, tournsize=3)
-
+        
+        toolbox.decorate("mate", self.checkBounds())
+        toolbox.decorate("mutate", self.checkBounds())
         def main(): #  This is necessary to enable multiprocessing.
-            
             pop = toolbox.population_guess()        
             hof = tools.HallOfFame(maxsize=20)        
             stats = tools.Statistics(lambda ind: ind.fitness.values)
@@ -596,7 +638,7 @@ class Portfolio(object):
                                                      stats,
                                                      halloffame=hof,
                                                      verbose=True)
-            
+            #print('before best_ind')
             best_ind = tools.selBest(pop, 1)[0]
             print("Best individual is %s, %s" % (best_ind, best_ind.fitness.values))
             self.best_ind = best_ind
@@ -633,6 +675,11 @@ class Portfolio(object):
         plt.show()
         
     def mutatePyfin(self, individual, indpb, number_changed):
+        
+        '''
+        Mutation function of Genetic Algorithm.
+        '''
+        #print('in mutate')
         ind_with_ra_payout = np.array(individual)
         ind = ind_with_ra_payout[1:]
         reshaped = ind.reshape(int(ind.size/self.size), self.size)
@@ -645,8 +692,12 @@ class Portfolio(object):
             ra_payout = np.random.random()*0.27
         else:
             ra_payout = ind_with_ra_payout[0]
-        return creator.Individual(np.concatenate([ra_payout,
-                                                  reshaped.reshape(reshaped.size)])),
+        #print('finished with mutate')
+        #print('reshaped shape', reshaped.shape)
+        #print('reshaped after reshape', reshaped.reshape(reshaped.size).shape)
+        #print('concatted', np.insert(reshaped.reshape(reshaped.size), 0, ra_payout).shape)
+
+        return creator.Individual(np.insert(reshaped.reshape(reshaped.size), 0, ra_payout)),
         
     def determineRAContr(self, ibt):
         
@@ -659,6 +710,7 @@ class Portfolio(object):
         Parameters:
         ibt:        Annual Income Before Tax 
         '''
+        
         RA_annual_contr = 0
         iat = 0
         surplus = 1
@@ -1291,7 +1343,10 @@ class DI(Investment):
                 withdr_total += capital
         return withdr_total, withdrawal_cg
 
-    def calculateOptimalWithdrawal(self, contr, strategy='optimal'):
+    def calculateOptimalWithdrawal(self, 
+                                   contr,
+                                   strategy='optimal',
+                                   ra_payout_frac=0): # dummy variable for RA.
         
         self.df.loc[:, 'contr'] = contr    
         self.df.loc[:, 'withdrawals'] = 0
@@ -1429,7 +1484,7 @@ df_di = di.df
 df_ra = ra.df
 df_tfsa = tfsa.df
 df_p = p.df
-p.plot()
+#p.plot()
 print('Mean IAT: R', df_p.loc[p.first_retirement_date:, 'iat'].mean())
 #%%
 p.optimize()
