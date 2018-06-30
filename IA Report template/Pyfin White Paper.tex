@@ -4,7 +4,7 @@
 
 %%
 % Book metadata
-\title{StrataGEM}
+\title{PyFin}
 \author[]{Invoke Analytics}
 
 %%
@@ -150,22 +150,22 @@
 
 
 \section{Abstract} \label{ch:intro}
-StrataGEM is a tool for calculating the optimal allocation of a person's retirement savings in the South African tax environment. It helps an individual to decide on how future savings should be split between different savings options. It considers how much money is already in those accounts, how they grow, income tax, capital gains tax, as well as exemptions for vehicles such as Tax Free Savings Accounts and Retirement Annuities, both during the working and retirement phases of an individual's life. It uses an optimization function to find the optimal allocation of one's savable income to maximise a person's mean income after tax during retirement. The output of the tool is a report telling you how much money you should allocate to each of your savings for the rest of this tax year. It also provides the projects into the future.
+PyFin is a tool for calculating the optimal allocation of a person's retirement savings in the South African tax environment. It helps an individual to decide on how future savings should be split between different savings options. It considers how much money is already in those accounts, how they grow, income tax, capital gains tax, as well as exemptions for vehicles such as Tax Free Savings Accounts and Retirement Annuities, both during the working and retirement phases of an individual's life. It uses an optimization function to find the optimal allocation of one's savable income to maximise a person's mean income after tax during retirement. The output of the tool is a report with a possible allocation plan for the rest of this tax year. It also provides the projects into the future.
 
 \section{The Short Version}
 \subsection{Introduction}
-\paragraph{Background} This tool was inspired by a Fat Wallet Show podcast on \href{https://justonelap.com/podcast-can-one-etf-rule/}{JustOneLap}, which alerted me to the fact that investing optimally for my retirement is a really difficult problem. Although financial advisors can show that e.g. investing the full 27.5\% allowance in an RA is not the most effective way to structure your savings\sidenote{See for example \href{https://www.fin24.com/Finweek/Investment/save-thousands-in-tax-by-diversifying-your-retirement-savings-20180110}{"Save thousands in tax by diversifying your retirement savings"}, By Danie Venter, published 10 January 2018 on Fin24}, it is very difficult to find the optimal allocation, given the tax implications now and at retirement. For example, the more I put in my RA now, the lower my taxable income, and the more I can save on the same salary. But it does mean that during retirement I'll be paying more income tax than I would if I had put the (admittedly less) money in DIs\sidenote{See \href{http://www.stealthywealth.co.za/2018/05/i-love-capital-gains-tax.html}{this} Stealthy Wealth article on CGT vs income tax, and why you rather want to pay CGT. But there's also the CGT-inflation problem, as discussed later in this paper under \ref{tax rules}{Tax Rules}.}
+\paragraph{Background} This tool was inspired by a Fat Wallet Show podcast on \href{https://justonelap.com/podcast-can-one-etf-rule/}{JustOneLap}, which alerted me to the fact that investing optimally for my retirement is a really difficult problem. Although financial advisors can show that e.g. investing the full 27.5\% allowance in an RA is not the most effective way to structure your savings\sidenote{See for example \href{https://www.fin24.com/Finweek/Investment/save-thousands-in-tax-by-diversifying-your-retirement-savings-20180110}{"Save thousands in tax by diversifying your retirement savings"}, By Danie Venter, published 10 January 2018 on Fin24}, it is very difficult to find the optimal allocation, given the tax implications now and at retirement. For example, the more I put in my RA now, the lower my taxable income, and the more I can save on the same salary. But it does mean that during retirement I'll be paying more income tax than I would if I had put the (admittedly less) money in DIs\sidenote{See \href{http://www.stealthywealth.co.za/2018/05/i-love-capital-gains-tax.html}{this} Stealthy Wealth article on CGT vs income tax, and why you rather want to pay CGT. But there's also the CGT-inflation problem, as discussed later in this paper under \ref{tax rules}{Tax Rules}.}.
 At Invoke Analytics we solve difficult problems like these by using mathematical algorithms, machine learning, and statistics, and decided to see if we could help. 
 
 \paragraph{Points to note} \newthought{Pyfin was written by engineers} to support our personal finance decisions. Although we spoke to tax practitioners and did tests to ensure that we implemented the tax rules correctly, there are no guarantees. Use it at your own risk, it doesn't constitute financial advice, etc. etc.
 
-\newthought{Saving large amounts of money} in any of these vehicles will leave you with, well, large amounts of money\sidenote{Provided you use a low fee, high growth vehicle such as ETFs via \href{www.easyequities.co.za}{Easy Equities}}. There are better and worse ways to do it, of course, and that's where StrataGEM comes in. But the key is to save a lot. The calculator can only work with the money you're willing to put away. Living frugally and saving a lot will leave you richer (and probably happier) than living large and saving what is left optimally.
+\newthought{Saving large amounts of money} in any of these vehicles will leave you with, well, large amounts of money\sidenote{Provided you use a low fee, high growth vehicle such as ETFs via \href{www.easyequities.co.za}{Easy Equities}}. There are better and worse ways to do it, of course, and that's where PyFin comes in. But the key is to save a lot. The calculator can only work with the money you're willing to put away. Living frugally and saving a lot will leave you richer (and probably happier) than living large and saving what is left optimally.
 
 \newthought{"Year zero", when your funds run out}, is extremely sensitive to the withdrawal rate. If you withdraw too much or the investments underperform, you could run out of money years before your life expectancy. The ``4\% rule'' says that backtested over the last hundred years, withdrawing 4\% of capital per year from an investment will ensure that you preserve your capital\sidenote{E.g., see \href{http://www.stealthywealth.co.za/2016/06/what-is-4-rule-for-retirement.html}{this} Stealthy Wealth article}. Pyfin has two settings: capital preservation, and income maximisation. With capital preservation, it will withdraw 4\% per year during retirement. With income maximisation, it will withdraw as much as it can to give you a steady income until your life expectancy. So it aims to have zero capital in the year of your death. These the withdrawal rates are often above 4\%, depending on your retirement age and life expectancy. Bear that in mind.
 
-\newthought{StrataGEM's objective is to maximise your mean retirement income after tax}, not to minimize the tax you pay. These two numbers are related, but not identical. The algorithm tries to structure your investments in such a way that your money works for you in the most effective way possible. However, the solutions may be counter-intuitive. It may seem that you pay less tax by sticking to the R33k TFSA limit and using your 27.5\% RA allowance. However, these have tax implications later in life, which may overshadow the tax benefits now (depending on the growth of the investments). 
+\newthought{PyFin's objective is to maximise your mean retirement income after tax}, not to minimize the tax you pay. These two numbers are related, but not identical. The algorithm tries to structure your investments in such a way that your money works for you in the most effective way possible. However, the solutions may be counter-intuitive. It may seem that you pay less tax by sticking to the R33k TFSA limit and using your 27.5\% RA allowance. However, these have tax implications later in life, which may overshadow the tax benefits now (depending on the growth of the investments). 
 
-\newthought{StrataGEM is powered by the PyFin library}, an open-source Python library created for this purpose and available on GitLab\sidenote{\url{https://gitlab.com/invokeanalytics/pyfin}}. Because the software was written to help individuals save money, and not cost them more money, it is licensed under the \href{https://opensource.org/licenses/GPL-3.0}{GPL-3.0}. The GPL license states that the source code, or any derivative work, must be free and must also carry the GPL license, and that the source code must be made available to the end user. This does not prevent commercial companies from using StrataGEM, but does make charging for the service, software, or derivative software illegal\sidenote{This does not prevent Invoke Analytics from tailoring StrataGEM to a specific commercial client's needs.}. This is called "copyleft"; the opposite of copyright. Amandla!
+\newthought{PyFin is powered by the PyFin library}, an open-source Python library created for this purpose and available on GitLab\sidenote{\url{https://gitlab.com/invokeanalytics/pyfin}}. Because the software was written to help individuals save money, and not cost them more money, it is licensed under the \href{https://opensource.org/licenses/GPL-3.0}{GPL-3.0}. The GPL license states that the source code, or any derivative work, must be free and must also carry the GPL license, and that the source code must be made available to the end user. This does not prevent commercial companies from using PyFin, but does make charging for the service, software, or derivative software illegal\sidenote{This does not prevent Invoke Analytics from tailoring PyFin to a specific commercial client's needs.}. This is called "copyleft"; the opposite of copyright. Amandla!
 
 
 \subsection{How it works}
@@ -178,7 +178,7 @@ There are many heuristic methods, most of which are inspired by natural processe
 \paragraph{Contributions}:
 It is assumed that contributions are made in equal monthly installments. If you invest all your savings in the first month of the tax year, your growth should exceed the project figures. On the other hand, if you withdraw the annual withdrawal figure on the first day of the new tax year, you will see less growth than if you withdraw the sum in equal amounts over twelve months.
 
-\paragraph{Inflation} Because StrataGEM is interested in the optimal investment allocation over time, and not the actual present value of future investments\sidenote{E.g. "to maintain your current living standards, you need to save so much per month"}, inflation doesn't really come into the play.
+\paragraph{Inflation} Because PyFin is interested in the optimal investment allocation over time, and not the actual present value of future investments\sidenote{E.g. "to maintain your current living standards, you need to save so much per month"}, inflation doesn't really come into the play.
 
 The one exception to this is Capital Gains Tax. Suppose you bought shares for R1m in 2010. If their value grew by the inflation rate, they would be worth roughly $1000000\times1.055^8 = R1.53$m in 2018. In real terms, your shares have not done anything - they have just kept up with inflation. You are no richer. If the country had a zero inflation rate, you might as well have put it under the mattress. But to SARS, you have realised a capital gain of R534 686.50, on which you will pay tax according to the capital gains formula\sidenote{In technical terms, CGT is not ``indexed''. If this seems vaguely unfair to you, you are in good company. For example, see \href{https://www.saica.co.za/integritax/2014/2285._The_effects_of_inflation.htm}{this} piece in the South African Institute of Chartered Accountants' newsletter.}. Because of CGT, assets growing at inflation are actually depreciating by the CGT.
 
@@ -188,9 +188,14 @@ Therefore we think that for the purposes of the calculation we do not need to co
 \paragraph{Tax rules} \label{tax rules}
 If we do include inflation in all our calculations, we should also adjust our tax brackets accordingly. Unfortunately, this isn't realistic. SARS allows "bracket creep" by not adjusting the tax brackets by inflation, thereby collecting more taxes as inflation increases our salaries. But projecting this into the future is difficult. So the best we can do is assume the current tax laws.
 
-Since StrataGEM is concerned with maximising retirement income and not estate planning, the capital gains tax payable on the disposal of assets at the time of death are not considered.
+Since PyFin is concerned with maximising retirement income and not estate planning, the capital gains tax payable on the disposal of assets at the time of death are not considered.
 
-``CGT Hacking'' and other fancy footwork are not built in\sidenote{SARS states that ``With  the  introduction  of  section 9C, the proceeds  on  disposal  of equity shares (including shares in foreign companies listed on a South African exchange) held as trading stock for at least three years are treated as being of a capital nature.(\href{http://www.sars.gov.za/AllDocs/OpsDocs/Guides/LAPD-IT-G11\%20-\%20Tax\%20Guide\%20for\%20Share\%20Owners\%20-\%20External\%20Guide.pdf}{Tax Guide for Share Owners, (Issue 5) , p.6.}) Some have wondered if one is still liable for CGT if one sells and buys shares every three years to avoid CGT. However, \href{https://justonelap.com/podcast-cgt-hacking-failed/}{as Simon Brown points out}, and as it states in \href{http://www.sars.gov.za/AllDocs/OpsDocs/Guides/LAPD-IT-G11\%20-\%20Tax\%20Guide\%20for\%20Share\%20Owners\%20-\%20External\%20Guide.pdf}{SARS Tax Guide for Share Owners, (Issue 5) , p.3.} ``The most important factor in determining whether a profit is of a capital or revenue nature is the intention of the person when the shares were bought and sold.'' Therefore StrataGEM does not bake such strategies in to avoid CGT. It would kinda be the definition of intentionally avoiding tax.}.
+``CGT Hacking'' and other fancy footwork are not built in\sidenote{SARS states that ``With  the  introduction  of  section 9C, the proceeds  on  disposal  of equity shares (including shares in foreign companies listed on a South African exchange) held as trading stock for at least three years are treated as being of a capital nature.(\href{http://www.sars.gov.za/AllDocs/OpsDocs/Guides/LAPD-IT-G11\%20-\%20Tax\%20Guide\%20for\%20Share\%20Owners\%20-\%20External\%20Guide.pdf}{Tax Guide for Share Owners, (Issue 5) , p.6.}) Some have wondered if one is still liable for CGT if one sells and buys shares every three years to avoid CGT. However, \href{https://justonelap.com/podcast-cgt-hacking-failed/}{as Simon Brown points out}, and as it states in \href{http://www.sars.gov.za/AllDocs/OpsDocs/Guides/LAPD-IT-G11\%20-\%20Tax\%20Guide\%20for\%20Share\%20Owners\%20-\%20External\%20Guide.pdf}{SARS Tax Guide for Share Owners, (Issue 5) , p.3.} ``The most important factor in determining whether a profit is of a capital or revenue nature is the intention of the person when the shares were bought and sold.'' Therefore PyFin does not bake such strategies in to avoid CGT. It would kinda be the definition of intentionally avoiding tax.}.
+
+\paragraph{RAs}
+We assume that your RA is paid into a living annuity, not a guaranteed annuity. A guaranteed annuity is an insurance product that pays out every month until you die, while a living annuity is an investment that pays out until the funds are depleted, or you die, in which case it is treated like any other investment. Because guaranteed annuities are sold by life insurance companies (who are usually crooks), and they can charge any price they like, we're not going to put that into our model.
+
+The model determines the optimal RA payout, once again for your mean annual income after tax during retirement, not necessarily the minimum tax in the RA payout year.
 
 \subsection{What to expect}
 The first thing to expect is that you will be taking financial advice from a computer, which feels a bit weird. You could try to be fancy and call it a ``Robo-advisor'' or ``AI'' the way OUTvest and other financial services companies' marketing departments do, but that's just smoke and mirrors. It is not a robot, and it is not AI. But it is still a computer program. Of course a lot of human expertise, thought, and care went into building the program, but you may still be uncomfortable investing money, possibly in counter-intuitive ways, on the advice from a calculator. It feels weird to us too. The best advice we have is to check the answers. Try to come up with a better solution yourself by trying different plans. This will give you a feel for the numbers.
@@ -198,42 +203,120 @@ The first thing to expect is that you will be taking financial advice from a com
 The output of the analysis will be a report that shows you how to allocate your funds, and how your capital is expected to grow. You will also get a spreadsheet showing all of the intermediate numbers, in case you are interested.
 
 \newpage
-\section{The Gory Details}
+\section{The Gory Tax Details}
 
-\subsection{The Gory Tax Details}
+\textit{\newthought{This section} has been written to reflect our understanding of how tax works. This is done so that the reader may identify shortcomings in the calculation. However, even if it is described correctly below, that does not mean that the code does the same thing.}
 
-\subsection{The Gory Programming Details}
+For the purposes of this calculation there are two main kinds of taxes payable by individuals in South Africa: income tax, and capital gains tax. There are also a few cases where one can obtain tax deductions. The only one taken into account in PyFin (at present) is medical aid and medical expenses.
 
+\subsection{Tax Brackets}
+Income tax is payable on income received as a salary or an annuity after retirement. One can decrease one's taxable income by up to 27.5\% by making contributions to a retirement annuity, pension, or provident fund. Not only does this decrease the overall tax you'll pay in the current financial year, but it may also push you into a lower tax bracket, meaning that your taxable income is also taxed at a (marginally) lower rate. Unfortunately you pay SARS back when the RA contribution is paid out as an annuity during retirement, and on capital gains if you opt to take the up-to-30\% lump sum payment at retirement. However, these tax rates are lower if you're over 65, so you do win in the long run\sidenote{Note: You win if the aren't robbed blind by an old-style RA such as those sold by life insurance companies (Liberty, Old Mutual, Sanlam). If you're going to get an RA, get one from a company like Easy Equities, 10x, or Sygnia, or don't bother.}.
 
+We understand income tax to work in the following way:
+
+If you earn less than R78~150, you don't pay taxes. If you earn more than that, the formula is:
+
+\begin{equation} \label{equ:IncomeTax}
+\textrm{Tax} = \textrm{Fixed sum} + (\textrm{income} - \textrm{lower threshold})\times \textrm{rate} - \textrm{rebate}
+\end{equation}
+
+where these variables can be found in Table~\ref{tab:IncomeTax}, and the rebates in Table~\ref{tab:rebates}. The rebates effectively set the lower tax thresholds: For under 65s, it is R78~150, for 65s-75s it is R121~000, and for over 75s it is R135~300.
+\begin{table}[b]
+	\centering
+	\caption{South African Income Tax Brackets for 2019}
+	\label{tab:IncomeTax}
+	\begin{tabular}{lccc}
+		\toprule
+		\textbf{Income Bracket}  & \textbf{Fixed sum} & \textbf{Lower Threshold} & \textbf{Rate} \\
+		\midrule
+		195 850            & 0         &          & 0.18 \\
+		195 851 -305 850  & 35 253    & 195 850         & 0.26 \\
+		305 851 - 423 300  & 65 583    & 305850          & 0.31  \\
+		423 301 - 555 600  & 100 263   & 423 300         & 0.36  \\
+		555 601 - 708 310    & 147 891   & 555 600         & 0.39  \\
+		708 301 - 1500 000 & 207448    & 708 310         & 0.41 \\
+		1 500 000+         & 532 041   & 1 500 000       & 0.45\\
+	\bottomrule
+	\end{tabular}
+\end{table}
+
+Annuity incomes will be taxed at these rates, with the age thresholds taken into account.
+
+\begin{table}[]
+	\centering
+	\caption{Income Tax Rebates for individuals by age.}
+	\label{tab:rebates}
+	\begin{tabular}{cc}
+		\toprule
+		\textbf{Age}           & \textbf{Rebate} \\
+		\midrule
+		$<$65 & 14 067 \\
+		65-75         & 21 780 \\
+		75+           & 24 354\\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\subsection{Credits for Medical Expenses}
+If you are under 65, you get a tax credit of R310 for the first two dependents on your registered medical aid. You get R209 for every dependent after that. Also, 25\% of your medical expenses above 7.5\% of your annual taxable income, not covered by your medical aid, can be claimed back. So, if you earn R100~000 per year, 7.5\% of your taxable income is R7~500 per year. If your  medical expenses not covered by your medical aid are R10~000, you can claim 25\% of the R2~500 back, which would be R625. As you earn more, you need to have to be in quite deep trouble before SARS will give you some money back.
+If you are over 65, the ``inclusion rate'' (the 25\% above), goes up to 33\%.
+
+\subsection{RA Deduction}
+An individual may contribute up to 27.5\% of their income to an RA, so that this is deducted from their taxable income. In other words, if you earn R100~000 per year, and you put R27.5\% in an RA, your taxable income is R72~500, which puts you under the tax treshold. If you don't do it, you will be taxed 18\% of $R100~000-R78~150 = R21~850$, which is R3~933.
+
+\subsection{Capital Gains Tax}
+SARS taxes you on the profit you make from buying and selling things like property or shares (excluding your primary residence).
+This works in the following way:
+\begin{equation}
+\textrm{Taxable Capital Gains} = 0.18\times(\textrm{Profit} - 40 000)
+\end{equation}
+So if you buy shares for R1m and sell them for R2m, you have realised a capital gain of R1m. The first R40~000 in combined capital gains from all assets sold in any given year is tax free. So if this was the only capital gains your realised, to SARS will consider a gain of R960~000. 18\% of this is R172~800. This sum is added to your taxable income, and taxed at the rate in which this puts your taxable income for the year. If you earn a lot, you may pay close to 45\% of this profit over to SARS. If you earn nothing, your taxable income would be R172~800, where you would pay 18\% tax on the amount above R78~150. As mentioned previously, SARS doesn't ``index'' CGT, so even simple inflation-growth is taxed in this way. Any growth from discretionary investments will attract capital gains tax according to this formula. However, for the lump sum payout of your RA, the exclusion is R500~000 instead of R40~000. The figures are shown in Table~\ref{tab:CGTRA}.
+
+Since capital gains tax is only realised at withdrawal, the capital gains component of an investment must by tracked over time, which becomes tricky with monthly contributions and growth. We keep a record of monthly contributions as well as total additional growth for a given point in time, and calculate capital gains as
+\begin{equation}
+\textrm{Capital Gains} = \textrm{Withdrawal sum}\times\frac{\textrm{Growth}}{\textrm{Capital contributed}}.
+\end{equation}
+
+\begin{table}[]
+	\centering
+	\caption{Capital Gains Tax on RA lump sum withdrawals. Use Eq.\ref{equ:IncomeTax} for the calculation.}
+	\label{tab:CGTRA}
+	\begin{tabular}{lccc}
+		\toprule
+		\textbf{Lump sum}  & \textbf{Fixed sum} & \textbf{Lower Threshold} & \textbf{Rate} \\
+		\midrule
+		$<$500~000            & 0         &          & 0 \\
+		500~000 - 700~000  & 0    & 500~000         & 0.18 \\
+		700 000 - 1 050 000  & 36 000   & 700 000          & 0.27  \\
+		1 050 00+  & 130 500   & 1 050 000      & 0.36  \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\subsection{Annual to Monthly Conversion}
+The contributions, withdrawals, capital growth, capital gains, etc. are stored on an annual basis, but the calculations assume that these are divided into twelve equal portions.
+
+To convert from annual to monthly interest, the following formula is used:
+
+\begin{equation}
+Growth_{monthly} = 10^{log_{10}\left(\frac{1 +Growth_{annually}}{12}\right)} - 1
+\end{equation}
+
+\newpage
+\section{The Gory Programming Details}
+The programming for PyFin is reasonably complex computationally. On a high level, the approach is to create classes for different savings vehicles: RA, TFSA, and DI. Each class has a Pandas dataframe object \texttt{df}, indexed by date annually (in tax years) from inception to the year of life expectancy. There are various routines with standardised names in each class.
+\newthought{calculate} is the central function for non-RA classes. This calculates the capital (and capital gains for DI), given a specific contribution and withdrawal regime as it appears in its dataframe.
+\newthought{calculateOptimalWithdrawal} calculates the optimal withdrawal rate so that capital runs out at life expectancy. If this is set to ``safe'' rather than the default ``optimal'', a 4\% withdrawal rate will be used.
+\newthought{\_calculateQuick} does calculations using numpy rather than Pandas, as this is much faster, which is necessary as this routine is called very often and slows down the optimisation process significantly.
+\newthought{calculateCapitalAnnualised} takes the given annual contributions, withdrawals, and growth, and calculates the true capital growth assuming monthly contributions and withdrawals.
+
+\subsection{TFSA}. This has one special function: \texttt{contrAfterTax}. This subtracts the 40\% tax if your annual our total contribution limits are exceeded. PyFin does not prevent you from contributing more; it just takes the tax into account. 
+
+\subsection{RA}. RAs are different animals to other savings vehicles, because before-tax money is used to invest in them, and because there is a discontinuity at retirement, with the lump sum withdrawal and reinvestment in a living annuity for the rest. Therefore \texttt{growthBeforeRetirement} and \texttt{growthAfterRetirement} are separate functions, but also with a \texttt{growthAfterRetirementOptimalWithdrawal} function. 
+
+\bigskip
 This document was created in \LaTeX using the Tufte template, available at \url{https://github.com/edwardtufte/tufte-latex}
-%\bigskip
-%\begin{minipage}{\textwidth}
-%\begin{center}
-%\begin{tabular}{lcccc}
-%\toprule
-% & \multicolumn{4}{c}{Books} \\
-%\cmidrule(l){2-5} 
-%Page content & \vdqi & \ei & \ve & \be \\
-%\midrule
-%Blank half title page & \hangp{1} & \hangp{1} & \hangp{1} & \hangp{1} \\
-%Frontispiece\footnotemark{}
-%  & \hangp{2} & \hangp{2} & \hangp{2} & \hangp{2} \\
-%Full title page & \hangp{3} & \hangp{3} & \hangp{3} & \hangp{3} \\
-%Copyright page & \hangp{4} & \hangp{4} & \hangp{4} & \hangp{4} \\
-%Contents & \hangp{5} & \hangp{5} & \hangp{5} & \hangp{5} \\
-%Blank & -- & \hangp{6} & \hangp{6} & \hangp{6} \\
-%Dedication & \hangp{6} & \hangp{7} & \hangp{7} & 7 \\
-%Blank & -- & \hangp{8} & -- & \hangp{8} \\
-%Epigraph & -- & -- & \hangp{8} & -- \\
-%Introduction & \hangp{7} & \hangp{9} & \hangp{9} & 9 \\
-%\bottomrule
-%\end{tabular}
-%\end{center}
-%\end{minipage}
-%\vspace{-7\baselineskip}\footnotetext{The contents of this page vary from book to book.  In
- % \vdqi this page is blank; in \ei and \ve this page holds a frontispiece;
-%  and in \be this page contains three epigraphs.}
-%\vspace{7\baselineskip}
+
 
 %\begin{figure*}[p]
 %\fbox{\includegraphics[width=0.45\linewidth]{graphics/vdqi-title.pdf}}

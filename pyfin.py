@@ -7,14 +7,10 @@ Created on Sat Jun  2 16:53:46 2018
 """
 ### TODO:
 #  Bou inflasie in
-#  Bou bounds in
-#  Maak aftredejaar RA reg. 
 #  Bou spreiblad vermoë in
 #  fooie?
 #  Bou plan evalueringsvermoë in (sonder optimering)
 #  Maak skoon, comment, privatiseer funksies en veranderlikes.
-#  Skryf White Paper
-#  Heroku
 
 import numpy as np 
 import pandas as pd
@@ -207,14 +203,17 @@ class Portfolio(object):
         ------
         Returns:        ndarray. Same shape as input. Just with Rand values.
         '''
+        #print('ind\n', ind)
+        #print('==========')
         contr = np.zeros_like(ind[1:]) #  exclude RA payout fraction (first item in arr)
-        ra_contr = ind[1:, :len(self.ra_list)].sum(axis=1)
+        ra_contr = self.taxable_ibt*ind[1:, :len(self.ra_list)].sum(axis=1)
         tax = np.zeros(len(contr))
-        for i in range(1, len(contr)):
-            tax[i] = self.incomeTax(self.taxable_ibt - ra_contr[i])
-        savable_income = self.taxable_ibt - ra_contr - tax - self.expenses
+        for i, year in enumerate(self.df.index[1:]):
+            tax[i] = self.incomeTax(self.taxable_ibt - ra_contr[i], age=self.df.loc[year, 'age'])
+        savable_income = np.maximum(0, self.taxable_ibt - ra_contr - tax - self.expenses)
         contr[:, :len(self.ra_list)] = self.taxable_ibt*np.array(ind[1:, :len(self.ra_list)])
         contr[:, len(self.ra_list):] = savable_income[:, None]*np.array(ind[1:, len(self.ra_list):])
+        #print('contr\n', contr)
         return contr
 
         
@@ -366,13 +365,13 @@ class Portfolio(object):
             else:
                 taxable_income = max(0, s.taxable_ibt + 0.18*max(0, s.capital_gains - 40000) - 135300)                
         
-        tax = self.incomeTax(taxable_income)
+        tax = self.incomeTax(taxable_income, age)
         
         self.taxCreditMa(s.medical_expenses, taxable_income, age)    
         return max(0, tax - self.tax_credit_ma)
     
     #@numba.jit
-    def incomeTax(self, taxable_income):
+    def incomeTax(self, taxable_income, age=64):
         
         '''
         Calculates tax according to income tax brackets.
@@ -385,22 +384,30 @@ class Portfolio(object):
         income tax as float.
         '''
         
+        if age < 65:
+            rebate = 14067
+        elif age < 75:
+            rebate = 14067 + 7713
+        else:
+            rebate = 14067 + 7713 + 2574
+            
+        
         if taxable_income <= 78150:
             return 0
         if taxable_income <= 195850:
-             return  0.18*taxable_income
+             return  0.18*(taxable_income) - rebate
         elif taxable_income <= 305850:
-             return  35253 + (taxable_income - 195850)*0.26
+             return  35253 + ((taxable_income) - 195850)*0.26 - rebate
         elif taxable_income <= 423300:
-             return  63853 + (taxable_income - 305850)*0.31
+             return  63853 + (taxable_income - 305850)*0.31 - rebate
         elif taxable_income <= 555600:
-             return  100263 + (taxable_income - 305850)*0.36
+             return  100263 + (taxable_income - 423300)*0.36 - rebate
         elif taxable_income <= 708310:
-             return  147891 + (taxable_income - 555600)*0.39
+             return  147891 + (taxable_income - 555600)*0.39 - rebate
         elif taxable_income <= 1500000:
-             return  207448 + (taxable_income - 708310)*0.41
-        elif taxable_income >=1500000:
-             return  532041 + (taxable_income - 1500000)*0.45
+             return  207448 + (taxable_income - 708310)*0.41 - rebate
+        elif taxable_income >= 1500000:
+             return  532041 + (taxable_income - 1500000)*0.45 - rebate
     
     #@numba.jit
     def taxCreditMa(self, medical_expenses, taxable_income, age):
@@ -556,7 +563,7 @@ class Portfolio(object):
         #  Equally divided portions:
         contr = np.zeros([self.number_working_years + self.number_retirement_years + 1, self.size])        
         for i in range(self.number_working_years):
-            contr[i, :] = self.savable_income/self.size*np.array([1]*self.size)
+            contr[i, :] = 1/self.size*np.array([1]*self.size)
                         
         ind_list += [np.insert(contr.reshape(contr.size),
                                0,
@@ -588,8 +595,8 @@ class Portfolio(object):
                     others[others==0] = 0.01
                     others = others/others.sum(axis=1)[:, None] # normalize
                     ra_payout = np.clip(child[0], 0, 0.3)
-                    ind[:, :len(self.ra_list)] = ras
-                    ind[:, len(self.ra_list):] = others  
+                    ind[:, :len(self.ra_list)] = np.abs(ras)
+                    ind[:, len(self.ra_list):] = np.abs(others)  
                     child = creator.Individual(np.insert(ind.reshape(ind.size), 0, ra_payout)),
                 #print('ending checkbounds')
                 return offspring
@@ -611,8 +618,8 @@ class Portfolio(object):
 
         toolbox.register("evaluate", self.fitness)
         toolbox.register("mate", tools.cxOnePoint)
-        toolbox.register("mutate", self.mutatePyfin, indpb=1, number_changed=3)
-        toolbox.register("select", tools.selTournament, tournsize=3)
+        toolbox.register("mutate", self.mutatePyfin, indpb=0.9, number_changed=10)
+        toolbox.register("select", tools.selTournament, tournsize=5)
         
         toolbox.decorate("mate", self.checkBounds())
         toolbox.decorate("mutate", self.checkBounds())
@@ -626,8 +633,8 @@ class Portfolio(object):
             stats.register("max", np.max, axis=0)        
             MU = int(self.pop_size)
             LAMBDA = int(self.pop_size)
-            CXPB = 0.5
-            MUTPB = 0.5
+            CXPB = 0.7
+            MUTPB = 0.2
             pop, logbook = algorithms.eaMuPlusLambda(pop, 
                                                      toolbox, 
                                                      MU, 
@@ -654,7 +661,7 @@ class Portfolio(object):
     
         plt.rcParams['font.family'] = "serif"
         plt.rcParams['font.size'] = 14
-        plt.figure(1)
+        plt.figure(0)
         fig, ax1 = plt.subplots()
         line1 = ax1.plot(gen, fit_mins, "b-", label="Minimum Fitness")
         ax1.set_xlabel("Generation")
@@ -682,6 +689,7 @@ class Portfolio(object):
         #print('in mutate')
         ind_with_ra_payout = np.array(individual)
         ind = ind_with_ra_payout[1:]
+        ra_payout = ind_with_ra_payout[0]
         reshaped = ind.reshape(int(ind.size/self.size), self.size)
         for i in range(number_changed):
             if indpb < np.random.random():
@@ -689,9 +697,7 @@ class Portfolio(object):
                     position = np.random.randint(0, self.size)
                     reshaped[year, position] = max(0, reshaped[year, position]*np.random.normal(1, 0.5/3)) 
         if indpb < np.random.random():
-            ra_payout = np.random.random()*0.27
-        else:
-            ra_payout = ind_with_ra_payout[0]
+            ra_payout = ra_payout + np.random.random()*0.1 - 0.05
         #print('finished with mutate')
         #print('reshaped shape', reshaped.shape)
         #print('reshaped after reshape', reshaped.reshape(reshaped.size).shape)
@@ -699,7 +705,7 @@ class Portfolio(object):
 
         return creator.Individual(np.insert(reshaped.reshape(reshaped.size), 0, ra_payout)),
         
-    def determineRAContr(self, ibt):
+    def determineRAContr(self, ibt, RA_monthly_contr=0, age=64):
         
         '''
         Convenience function calculating how much your RA contr can be to the 
@@ -710,27 +716,40 @@ class Portfolio(object):
         Parameters:
         ibt:        Annual Income Before Tax 
         '''
-        
-        RA_annual_contr = 0
-        iat = 0
-        surplus = 1
-        while surplus > 0:
-            RA_annual_contr += 100
+        if RA_monthly_contr == 0:
+            RA_annual_contr = 0
+            iat = 0
+            surplus = 1
+            while surplus > 0:
+                RA_annual_contr += 100
+                ibt_ara = ibt - RA_annual_contr            
+                iat = ibt_ara - self.incomeTax(ibt_ara, age)
+                surplus = iat - self.expenses
+            
+            RA_annual_contr -= 100
             ibt_ara = ibt - RA_annual_contr            
-            iat = ibt_ara - self.incomeTax(ibt_ara)
+            iat = ibt_ara - self.incomeTax(ibt_ara, age)
             surplus = iat - self.expenses
-        
-        RA_annual_contr -= 100
-        ibt_ara = ibt - RA_annual_contr            
-        iat = ibt_ara - self.incomeTax(ibt_ara)
-        surplus = iat - self.expenses
-        RA_monthly_contr = RA_annual_contr/12
-        iat_monthly = iat/12
-        print('RA Debit order: \t\t\t\tR', round(RA_monthly_contr, 2))
-        print('Monthly IAT: \t\t\t\t\tR', round(iat_monthly))
-        print('Max tax free RA contr (27.5% of IBT) = \t\tR', round(0.275*ibt/12, 2))
-        print('Total earned per month, incl. RA: \t\tR', round(RA_annual_contr/12 + iat_monthly, 2))
-        print('Total monthly tax = \t\t\t\tR', round(self.incomeTax(ibt_ara)/12, 2))
+            RA_monthly_contr = RA_annual_contr/12
+            iat_monthly = iat/12
+            print('RA Debit order: \t\t\t\tR', round(RA_monthly_contr, 2))
+            print('Monthly IAT: \t\t\t\t\tR', round(iat_monthly))
+            print('Max tax free RA contr (27.5% of IBT) = \t\tR', round(0.275*ibt/12, 2))
+            print('Total earned per month, incl. RA: \t\tR', round(RA_annual_contr/12 + iat_monthly, 2))
+            print('Total monthly tax = \t\t\t\tR', round(self.incomeTax(ibt_ara, age)/12, 2))
+
+        else:
+            RA_annual_contr = RA_monthly_contr*12
+            ibt_ara = ibt - RA_annual_contr            
+            iat = ibt_ara - self.incomeTax(ibt_ara, age)
+            surplus = iat - self.expenses           
+            iat_monthly = iat/12
+            print('RA Debit order: \t\t\t\tR', round(RA_monthly_contr, 2))
+            print('Annual taxable income: \t\t\t\tR', round(ibt_ara))
+            print('Monthly IAT: \t\t\t\t\tR', round(iat_monthly))
+            print('Max tax free RA contr (27.5% of IBT) = \t\tR', round(0.275*ibt/12, 2))
+            print('Total earned per month, incl. RA: \t\tR', round(RA_annual_contr/12 + iat_monthly, 2))
+            print('Total monthly tax = \t\t\t\tR', round(self.incomeTax(ibt_ara, age)/12, 2))
 
 
 class Investment(object):
@@ -1126,7 +1145,7 @@ class RA(Investment):
         previous_year = self.df.index[0]
         self.df['contr'] = contr    
         
-        for year in self.df.loc[self.df.index[0]:self.retirement_date].index[1:]:
+        for year in self.df.loc[self.df.index[0]:self.first_retirement_date].index[1:]:
             self.df.loc[year, 'capital'] = self.calculateCapitalAnnualized(self.df.loc[previous_year, 'capital'],
                                                                             self.df.loc[year, 'contr'],
                                                                             0,
@@ -1327,20 +1346,25 @@ class DI(Investment):
         withdr_total = 0
         withdrawal_cg = 0
         capital_gains_calc = 0
-        contr = contributions/installments
+        #contr = contributions/installments
         withdr = withdrawals/installments
-        capital = capital*(1 + monthly_growth) + contr - withdr
+        capital = capital*(1 + monthly_growth) - withdr # + contr
         withdr_total += withdr
+        print('withdrawals', withdrawals)
         while capital > 0:
-            capital_gains_calc = capital_gains_calc + capital*growth
+            capital_gains_calc = capital_gains_calc + capital*monthly_growth
             if withdrawals < capital:
-                    withdrawal_cg_incr = withdrawals*capital_gains_calc/capital
-                    capital_gains_calc -= withdrawal_cg_incr
-                    withdrawal_cg += withdrawal_cg_incr            
-                    capital = capital*(1 + monthly_growth) + contr - withdr
+                print('capital', capital)
+                print('capital gains calc', capital_gains_calc)
+                withdrawal_cg_incr = withdrawals*capital_gains_calc/capital
+                capital_gains_calc -= withdrawal_cg_incr
+                withdrawal_cg += withdrawal_cg_incr            
+                capital = capital*(1 + monthly_growth) - withdr
             else:
                 withdrawal_cg += capital_gains_calc
                 withdr_total += capital
+                capital = 0
+            withdrawals += 100
         return withdr_total, withdrawal_cg
 
     def calculateOptimalWithdrawal(self, 
@@ -1389,12 +1413,12 @@ class DI(Investment):
 
             if self.df.loc[year, 'capital'] == 0:
                 self.df.loc[year, 'withdrawals'],\
-                self.df.loc[year, 'withdrawal_cg'] = self.calculateLastYearWithdrawals(self.df.loc[previous_year, 'capital'],
-                                                                           self.df.loc[previous_year, 'capital_gains'],
-                                                                            self.df.loc[year, 'contr'],
-                                                                            self.df.loc[year, 'withdrawals'], 
-                                                                            self.growth)
-                self.df.loc[year, 'capital_gains'] = 0
+                #self.df.loc[year, 'withdrawal_cg'] = self.calculateLastYearWithdrawals(self.df.loc[previous_year, 'capital'],
+                #                                                           self.df.loc[previous_year, 'capital_gain'],
+                #                                                            self.df.loc[year, 'contr'],
+                #                                                            self.df.loc[year, 'withdrawals'], 
+                #                                                            self.growth)
+                self.df.loc[year, 'capital_gain'] = 0
                 
             '''
             if self.df.loc[year, 'withdrawals'] <= self.df.loc[year, 'capital']:
@@ -1415,8 +1439,8 @@ class DI(Investment):
 #%% Portfolio
 
 p = Portfolio(dob='1987-02-05',
-              ibt=60000*12,
-              expenses=21000*12,
+              ibt=27375*12,
+              expenses=16000*12,
               ma_dependents=2,
               medical_expenses=12000,
               era=65,
