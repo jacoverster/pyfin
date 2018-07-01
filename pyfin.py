@@ -413,16 +413,16 @@ class Portfolio(object):
     def taxCreditMa(self, medical_expenses, taxable_income, age):
         if age > 65:
             if self.ma_dependents <=2:
-                ma_d_total = self.ma_dependents*310
+                ma_d_total = self.ma_dependents*310*12
             else:
-                ma_d_total = 620 + (self.ma_dependents - 2)*209
+                ma_d_total = 620*12 + 12*(self.ma_dependents - 2)*209
             
             self.tax_credit_ma = 0.33*(medical_expenses - 3*ma_d_total)
         else:
             if self.ma_dependents <=2:
                 ma_d_total = self.ma_dependents*310
             else:
-                ma_d_total = 620 + (self.ma_dependents - 2)*209
+                ma_d_total = 12*620 + 12*(self.ma_dependents - 2)*209
             
             if medical_expenses > 0.075*taxable_income:
                 self.tax_credit_ma = ma_d_total + 0.25*(self.medical_expenses - 0.075*taxable_income)
