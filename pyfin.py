@@ -5,13 +5,6 @@ Created on Sat Jun  2 16:53:46 2018
 
 @author: herman
 """
-### TODO:
-#  Bou inflasie in
-#  Bou spreiblad vermoë in
-#  fooie?
-#  Bou plan evalueringsvermoë in (sonder optimering)
-#  Maak skoon, comment, privatiseer funksies en veranderlikes.
-
 import numpy as np 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -68,6 +61,13 @@ class Portfolio(object):
         self.ra_list = []
         self.tfsa_list = []
         self.di_list = []
+        self.investment_names = []
+        self.max_ra_growth = 0
+        self.max_tfsa_growth = 0
+        self.max_di_growth = 0
+        self.max_ra_name = ''
+        self.max_tfsa_name = ''
+        self.max_di_name = ''        
         
         self.df = pd.DataFrame(index=pd.DatetimeIndex(start=pd.datetime.today().date(),
                                                       end=pd.datetime(self.dob.year + le, self.dob.month, self.dob.day),
@@ -124,15 +124,28 @@ class Portfolio(object):
         investments:    monpy Investment. Investment object. Can be an RA,
                         TFSA, or DI.
         '''
+        
+        assert name not in self.investment_names
+        
         if isinstance(name, str):
             self.investments[name] = investment
+            self.investment_names += [name]
             self.size +=1
             if investment.type == 'RA':
                 self.ra_list += [name]
+                if investment.growth > self.max_ra_growth:
+                    self.max_ra_growth = investment.growth
+                    self.max_ra_name = name
             elif investment.type == 'TFSA':
                 self.tfsa_list += [name]
+                if investment.growth > self.max_tfsa_growth:
+                    self.max_tfsa_growth = investment.growth
+                    self.max_tfsa_name = name
             elif investment.type == 'DI':
                 self.di_list += [name]
+                if investment.growth > self.max_di_growth:
+                    self.max_di_growth = investment.growth
+                    self.max_di_name = name
             else:
                 print('Type for {} not recognised'.format(name)) 
                 
@@ -140,6 +153,7 @@ class Portfolio(object):
             for name, count in enumerate(name):
                 self.size += 1
                 self.investments[name] = investment[count]
+                self.investment_names += [name]
                 if investment[count].type == 'RA':
                     self.ra_list += [name]
                 elif investment[count].type == 'TFSA':
@@ -173,7 +187,7 @@ class Portfolio(object):
                                      columns=np.arange(0, self.size))
 
         self.pop_size = 100
-        self.ngen = 20
+        self.ngen = 40
         self.GA()
         self.solution = self.fractionsToRands(self.reshape(self.best_ind))
 
@@ -210,9 +224,13 @@ class Portfolio(object):
         tax = np.zeros(len(contr))
         for i, year in enumerate(self.df.index[1:]):
             tax[i] = self.incomeTax(self.taxable_ibt - ra_contr[i], age=self.df.loc[year, 'age'])
+        #print('before savable income')
         savable_income = np.maximum(0, self.taxable_ibt - ra_contr - tax - self.expenses)
+        #print('after savable income')
         contr[:, :len(self.ra_list)] = self.taxable_ibt*np.array(ind[1:, :len(self.ra_list)])
-        contr[:, len(self.ra_list):] = savable_income[:, None]*np.array(ind[1:, len(self.ra_list):])
+        #print('after assigning RA to contr')
+        contr[:, len(self.ra_list):] = self.savable_income*np.array(ind[1:, len(self.ra_list):])
+        #print('after assigning non-RAs to contr')
         #print('contr\n', contr)
         return contr
 
@@ -238,6 +256,7 @@ class Portfolio(object):
         '''
         #  Reshape array:
         #print('individual shape', np.array(individual).shape)
+        #print('In objective')
         scenario = self.fractionsToRands(self.reshape(individual))
         #print('scenario shape', scenario.shape)
         ra_payout_frac = individual[0]
@@ -545,20 +564,62 @@ class Portfolio(object):
         contr = np.array([plan if i < self.number_working_years else np.zeros(self.size) for i in range(len(contr))])
         #contr[:self.number_working_years, :] = np.array([self.convertPercentagesToRands(a) for i in range(self.number_working_years)])
         return np.insert(np.array(contr), 0, ra_payout)
+    
+    def taxEfficientIndividual(self):
         
+        #Allocate 27.5% to RAs and 33000 to TFSAs, and the rest to
+        #DIs
+        
+        contr = np.zeros([1 + self.number_working_years + self.number_retirement_years, self.size])
+        if len(self.ra_list) > 0:
+            contr_frac = 0
+            savable_income = 1
+            while contr_frac < 0.275 and savable_income > 0:      
+                    contr_frac += 0.001
+                    ra_contr = self.taxable_ibt*contr_frac
+                    tax = self.incomeTax(self.taxable_ibt - ra_contr, age=self.df.loc[self.df.index[0], 'age'])
+                    savable_income = np.maximum(0, self.taxable_ibt - ra_contr - tax - self.expenses)
+
+            if len(self.ra_list) == 1:
+                contr[0] = contr_frac
+            elif len(self.ra_list) > 1:
+                # find ra with max growth and allocate there
+                contr[0, self.investment_names.index[self.max_ra_name]] = contr_frac
+                
+        if savable_income >= 33000:
+            tfsa_frac = 33000/savable_income
+        else:
+            tfsa_frac = 1
+            
+        contr[0, self.investment_names.index(self.max_tfsa_name)] = tfsa_frac
+        #print('tfsa_frac', tfsa_frac)
+        #print('amount', tfsa_frac*savable_income)
+        if tfsa_frac < 1:
+            contr[0, self.investment_names.index(self.max_di_name)] = 1 - tfsa_frac
+        
+        contr_full = np.array([contr[0, :] if i < self.number_working_years else np.zeros(self.size) for i in range(len(contr))])
+
+        ra_payout = np.random.random()/3
+        return np.insert(np.array(contr_full), 0, ra_payout)
     
     def initPopulation(self, pcls, ind_init):
         
         ind_list = [np.ones([self.number_working_years,
                              self.size]) for i in range(self.pop_size)]
         ind_list=[]
+        contr = self.taxEfficientIndividual()
+        ind_list += [contr.reshape(contr.size)]   
         for j in np.geomspace(1/20, 100, 30):            
             contr = self.randomIndividual(j)
             ind_list += [contr.reshape(contr.size)]            
-        
+            contr = self.taxEfficientIndividual()
+            ind_list += [contr.reshape(contr.size)]    
+
         for j in np.geomspace(1/20, 100, 30):            
             contr = self.randomConstantIndividual(j)
             ind_list += [contr.reshape(contr.size)]
+            contr = self.taxEfficientIndividual()
+            ind_list += [contr.reshape(contr.size)]   
             
         #  Equally divided portions:
         contr = np.zeros([self.number_working_years + self.number_retirement_years + 1, self.size])        
@@ -568,6 +629,8 @@ class Portfolio(object):
         ind_list += [np.insert(contr.reshape(contr.size),
                                0,
                                np.random.random()*0.3)]
+        contr = self.taxEfficientIndividual()
+        ind_list += [contr.reshape(contr.size)]           
         
         self.ind_list = ind_list
         return (pcls(ind_init(i) for i in ind_list))
@@ -737,7 +800,7 @@ class Portfolio(object):
             print('Max tax free RA contr (27.5% of IBT) = \t\tR', round(0.275*ibt/12, 2))
             print('Total earned per month, incl. RA: \t\tR', round(RA_annual_contr/12 + iat_monthly, 2))
             print('Total monthly tax = \t\t\t\tR', round(self.incomeTax(ibt_ara, age)/12, 2))
-
+            print('Total annual RA contr', RA_annual_contr)
         else:
             RA_annual_contr = RA_monthly_contr*12
             ibt_ara = ibt - RA_annual_contr            
@@ -750,6 +813,7 @@ class Portfolio(object):
             print('Max tax free RA contr (27.5% of IBT) = \t\tR', round(0.275*ibt/12, 2))
             print('Total earned per month, incl. RA: \t\tR', round(RA_annual_contr/12 + iat_monthly, 2))
             print('Total monthly tax = \t\t\t\tR', round(self.incomeTax(ibt_ara, age)/12, 2))
+            print('Total annual RA contr\t\t\t\tR', round(RA_annual_contr, 2))
 
 
 class Investment(object):
@@ -780,7 +844,8 @@ class TFSA(Investment):
                  ytd,
                  ctd,
                  era,
-                 le):
+                 le,
+                 inflation=5.5):
         
         '''
         Tax-Free Savings Account object.
@@ -816,7 +881,11 @@ class TFSA(Investment):
         self.df.loc[self.df.index[0], 'YTD contr'] = self.ytd
         self.df.loc[self.df.index[0], 'Total contr'] = self.ctd  
         
-        self.growth = growth/100
+        self.overall_growth = growth/100
+        
+        self.inflation = inflation/100
+        #  In real terms:
+        self.growth = (1 + self.growth)/(1 + self.inflation) - 1
 
         self.retirement_date = pd.datetime(self.dob.year + era, self.dob.month, self.dob.day)
         self.last_working_date = self.df.loc[self.df.index<=self.retirement_date].index[-1]
@@ -1050,7 +1119,8 @@ class RA(Investment):
                  era,
                  le,
                  ytd,
-                 payout_fraction=1/3):
+                 payout_fraction=1/3,
+                 inflation=5.5):
         
         '''
         Retirement Annuity object. Assumes that the RA is converted to a living
@@ -1070,8 +1140,14 @@ class RA(Investment):
         Investment.__init__(self, initial, ra_growth)
         self.type = 'RA'
         self.dob = pd.to_datetime(dob).date()
-        self.ra_growth = ra_growth/100
-        self.la_growth = la_growth/100
+        self.ra_growth_overall = ra_growth/100
+        self.la_growth_overall = la_growth/100
+        
+        self.inflation = inflation/100
+        #  In real terms:
+        self.ra_growth = (1 + self.ra_growth_overall)/(1 + self.inflation) - 1
+        self.la_growth = (1 + self.la_growth_overall)/(1 + self.inflation) - 1
+
         self.monthly_la_growth = 10**(np.log10(1 + self.ra_growth)/12) - 1
         self.monthly_ra_growth = 10**(np.log10(1 + self.la_growth)/12) - 1
         self.payout_fraction = payout_fraction
@@ -1234,7 +1310,13 @@ class DI(Investment):
     
     #@numba.jit
 
-    def __init__(self, initial, growth, dob, era, le):
+    def __init__(self,
+                 initial,
+                 growth,
+                 dob,
+                 era,
+                 le,
+                 inflation=5.5):
         
         Investment.__init__(self, initial, growth)
         self.type = 'DI'
@@ -1254,7 +1336,11 @@ class DI(Investment):
                         'withdrawals',
                         'withdrawal_cg']] = 0
         self.df.loc[self.df.index[0], 'capital'] = self.initial
-        self.growth = growth/100
+        self.inflation = inflation/100
+        self.overall_growth = growth/100
+        #In real terms:
+        self.growth = (1 + self.overall_growth)/(1 + self.inflation) - 1
+
         self.monthly_growth = 10**(np.log10(1 + self.growth)/12) - 1
         self.retirement_date = pd.datetime(self.dob.year + era, self.dob.month, self.dob.day)
         self.first_retirement_date = self.df.loc[self.df.index>=self.retirement_date].index[0]
@@ -1305,13 +1391,18 @@ class DI(Investment):
         capital_calc = capital
         capital_gains_calc = capital_gains
         monthly_growth = 10**(np.log10(1 + growth)/12) - 1
+
+        cg_growth = (1 + self.inflation)*(growth + 1) - 1 #converting back from real terms
+        annual_cg_growth = 10**(np.log10(1 + cg_growth)/12) - 1
+        monthly_cg_growth = 10**(np.log10(1 + annual_cg_growth)/12) - 1
+
         contr = contributions/installments
         withdr = withdrawals/installments
         withdrawal_cg = 0
         withdrawal_cg_incr = 0
         for i in range(0, installments):
             if capital_calc > 0:
-                capital_gains_calc = capital_gains_calc + capital*monthly_growth
+                capital_gains_calc = capital_gains_calc + capital*monthly_cg_growth
                 withdrawal_cg_incr = withdrawals*(capital_gains_calc/capital)
                 capital_gains_calc -= withdrawal_cg_incr
                 withdrawal_cg += withdrawal_cg_incr
@@ -1342,7 +1433,13 @@ class DI(Investment):
                         done. Usually 12, except for first year.        
         '''
         monthly_growth = 10**(np.log10(1 + growth)/12) - 1
+        cg_growth = (1 + self.inflation)*(growth + 1) - 1 #converting back from real terms
+        annual_cg_growth = 10**(np.log10(1 + cg_growth)/12) - 1
+        monthly_cg_growth = 10**(np.log10(1 + annual_cg_growth)/12) - 1
 
+        cg_growth = (1 + self.inflation)*(growth + 1) - 1 #converting back from real terms
+        annual_cg_growth = 10**(np.log10(1 + cg_growth)/12) - 1
+        monthly_cg_growth = 10**(np.log10(1 + annual_cg_growth)/12) - 1
         withdr_total = 0
         withdrawal_cg = 0
         capital_gains_calc = 0
@@ -1352,7 +1449,7 @@ class DI(Investment):
         withdr_total += withdr
         print('withdrawals', withdrawals)
         while capital > 0:
-            capital_gains_calc = capital_gains_calc + capital*monthly_growth
+            capital_gains_calc = capital_gains_calc + capital*monthly_cg_growth
             if withdrawals < capital:
                 print('capital', capital)
                 print('capital gains calc', capital_gains_calc)
@@ -1436,11 +1533,13 @@ class DI(Investment):
             '''
             previous_year = year  
             
+
+
 #%% Portfolio
 
 p = Portfolio(dob='1987-02-05',
-              ibt=27375*12,
-              expenses=16000*12,
+              ibt=60000*12,
+              expenses=19000*12,
               ma_dependents=2,
               medical_expenses=12000,
               era=65,
@@ -1448,7 +1547,7 @@ p = Portfolio(dob='1987-02-05',
               strategy='optimal')
 
 tfsa = TFSA(initial=100000,
-            growth=7,
+            growth=15,
             ytd=0,
             ctd=10000,
             dob='1987-02-05',
@@ -1456,8 +1555,8 @@ tfsa = TFSA(initial=100000,
             le=95)
 
 ra = RA(initial=50000,
-        ra_growth=7,
-        la_growth=5,
+        ra_growth=12,
+        la_growth=10,
         ytd=2500,
         dob='1987-02-05',
         le=95,
@@ -1465,7 +1564,7 @@ ra = RA(initial=50000,
         payout_fraction=0)
 
 di = DI(initial=10000,
-        growth=5,
+        growth=15,
         dob='1987-02-05',
         era=65,
         le=95)
@@ -1473,7 +1572,7 @@ di = DI(initial=10000,
 contr_TFSA = pd.Series(index=tfsa.df.index, name='contr',
                        data=33000*np.ones(tfsa.df.shape[0]))
 contr_DI = pd.Series(index=tfsa.df.index, name='contr',
-                     data=5000*np.ones(tfsa.df.shape[0]))
+                     data=200000*np.ones(tfsa.df.shape[0]))
 contr_RA = pd.Series(index=tfsa.df.index, name='contr',
                      data=16500*np.ones(tfsa.df.shape[0]))
 withdrawals_TFSA = pd.Series(index=tfsa.df.index,
