@@ -73,10 +73,10 @@ class Portfolio(object):
                                                       end=pd.datetime(self.dob.year + le, self.dob.month, self.dob.day),
                                                       freq='A-FEB'),
                                 columns=['taxable_ibt',
-                                         'capital_gains',
-                                         'age',
-                                         'date',
-                                         'iat',
+                                        'capital_gains',
+                                        'age',
+                                        'date',
+                                        'iat',
                                         'withdrawals_total',
                                         'withdrawals_RA',
                                         'withdrawals_TFSA',
@@ -84,13 +84,15 @@ class Portfolio(object):
                                         'contr_RA',
                                         'contr_DI',
                                         'contr_TFSA',
-                                        'contr_total'])
+                                        'contr_total',
+                                        'contr_total_at',
+                                        'savable_iat'])
 
         self.df.loc[:, ['taxable_ibt',
-                         'capital_gains',
-                         'age',
-                         'date',
-                         'iat',
+                        'capital_gains',
+                        'age',
+                        'date',
+                        'iat',
                         'withdrawals_total',
                         'withdrawals_RA',
                         'withdrawals_TFSA',
@@ -98,7 +100,9 @@ class Portfolio(object):
                         'contr_RA',
                         'contr_DI',
                         'contr_TFSA',
-                        'contr_total']] = 0
+                        'contr_total',
+                        'contr_total_at',
+                        'savable_iat']] = 0
                         
         self.df.loc[:, 'age'] = (self.df.index - pd.Timestamp(self.dob)).days/365.25
         self.df.loc[:, 'medical_expenses'] = medical_expenses
@@ -187,7 +191,7 @@ class Portfolio(object):
                                      columns=np.arange(0, self.size))
 
         self.pop_size = 100
-        self.ngen = 40
+        self.ngen = 20
         self.GA()
         self.solution = self.fractionsToRands(self.reshape(self.best_ind))
 
@@ -217,21 +221,20 @@ class Portfolio(object):
         ------
         Returns:        ndarray. Same shape as input. Just with Rand values.
         '''
-        #print('ind\n', ind)
-        #print('==========')
         contr = np.zeros_like(ind[1:]) #  exclude RA payout fraction (first item in arr)
         ra_contr = self.taxable_ibt*ind[1:, :len(self.ra_list)].sum(axis=1)
         tax = np.zeros(len(contr))
         for i, year in enumerate(self.df.index[1:]):
-            tax[i] = self.incomeTax(self.taxable_ibt - ra_contr[i], age=self.df.loc[year, 'age'])
-        #print('before savable income')
+            taxSeries = pd.Series({'taxable_ibt': self.taxable_ibt,
+                            'contr_RA': ra_contr[i],
+                            'capital_gains': 0,
+                            'medical_expenses': self.medical_expenses})
+            taxSeries.name = year
+            tax[i] = self.totalTax(taxSeries)
+        
         savable_income = np.maximum(0, self.taxable_ibt - ra_contr - tax - self.expenses)
-        #print('after savable income')
         contr[:, :len(self.ra_list)] = self.taxable_ibt*np.array(ind[1:, :len(self.ra_list)])
-        #print('after assigning RA to contr')
-        contr[:, len(self.ra_list):] = self.savable_income*np.array(ind[1:, len(self.ra_list):])
-        #print('after assigning non-RAs to contr')
-        #print('contr\n', contr)
+        contr[:, len(self.ra_list):] = savable_income[:, None]*np.array(ind[1:, len(self.ra_list):])
         return contr
 
         
@@ -257,7 +260,7 @@ class Portfolio(object):
         #  Reshape array:
         #print('individual shape', np.array(individual).shape)
         #print('In objective')
-        scenario = self.fractionsToRands(self.reshape(individual))
+        scenario = self.fractionsToRands(self.rebalance(individual))
         #print('scenario shape', scenario.shape)
         ra_payout_frac = individual[0]
         self.contr.loc[:, self.contr.columns] = scenario
@@ -302,8 +305,8 @@ class Portfolio(object):
         '''
         
         self.df.loc[:, ['taxable_ibt',
-         'capital_gains',
-         'iat',
+        'capital_gains',
+        'iat',
         'withdrawals_total',
         'withdrawals_RA',
         'withdrawals_TFSA',
@@ -311,7 +314,9 @@ class Portfolio(object):
         'contr_RA',
         'contr_DI',
         'contr_TFSA',
-        'contr_total']] = 0
+        'contr_total',
+        'contr_total_at',
+        'savable_iat']] = 0
         self.ra_payouts = 0      
         self.df.loc[:self.last_working_date, 'taxable_ibt'] = self.taxable_ibt
         
@@ -327,6 +332,7 @@ class Portfolio(object):
             self.ra_payouts += self.investments[i].payout
             #  Check whether this works:
             self.df.loc[self.first_retirement_date, 'taxable_ibt'] += self.CGTRA(self.investments[i].payout)
+        
         for count, i in enumerate(self.di_list):
             if count == 0:  #  Allocate RA lump sums to first DI. Can build more
                             #  intelligent functionality later.
@@ -339,7 +345,7 @@ class Portfolio(object):
             self.df['withdrawals_DI'] += self.investments[i].df['withdrawals']
             self.df['capital_DI'] = self.investments[i].df['capital']
             self.df['contr_total'] += self.investments[i].df['contr']
-
+            self.df['contr_total_at'] += self.investments[i].df['contr']
 
         for i in self.tfsa_list:
             self.df['iat'] += self.investments[i].df['withdrawals']
@@ -348,11 +354,11 @@ class Portfolio(object):
             self.df['withdrawals_TFSA'] += self.investments[i].df['withdrawals']
             self.df['capital_TFSA'] = self.investments[i].df['capital']
             self.df['contr_total'] += self.investments[i].df['contr']
-
+            self.df['contr_total_at'] += self.investments[i].df['contr']
 
         self.df['it'] = self.df.apply(self.totalTax, axis=1)
-        #self.df['it'] = self.df['taxable_income'].map(self.IT)
-        self.df['iat'] = self.df['iat'] + self.df['taxable_ibt'] - self.df['it']
+        self.df['iat'] = self.df['iat'] + self.df['taxable_ibt'] - self.df['contr_RA'] - self.df['it']
+        self.df['savable_iat'] = self.df['iat'] - self.expenses
         
     def totalTax(self, s):
         
@@ -360,7 +366,7 @@ class Portfolio(object):
         Calculates total income tax.
         ------
         Parameters:
-        s:          Pandas Series. Containing columns capital_gains, income, RA_contributions
+        s:          Pandas Series. Containing columns capital_gains, income, contr_RA, taxable_ibt
         ------
         Returns:
         tax:                float. tax payable in a particular year
@@ -633,8 +639,23 @@ class Portfolio(object):
         ind_list += [contr.reshape(contr.size)]           
         
         self.ind_list = ind_list
-        return (pcls(ind_init(i) for i in ind_list))
+        return (pcls(ind_init(i) for i in ind_list))    
     
+    def rebalance(self, child):
+            #print('in decorator, ind shape:', np.array(child).shape)
+            ind = self.reshape(child)
+            #print('ind shape', ind.shape)
+            ras = ind[:, :len(self.ra_list)]
+            others = ind[:, len(self.ra_list):]
+            others = others/others.sum(axis=1)[:, None] # normalize
+            others[others==np.inf] = 0
+            others[others!=others] = 0
+            ra_payout = np.clip(child[0], 0, 0.3)
+            ind[:, :len(self.ra_list)] = np.abs(ras)
+            ind[:, len(self.ra_list):] = np.abs(others)
+            return ind
+
+ 
     def checkBounds(self):
         
         '''
@@ -646,20 +667,8 @@ class Portfolio(object):
             def wrapper(*args, **kwargs):
                 offspring = func(*args, **kwargs)
                 for child in offspring:
-                    #print('in decorator, ind shape:', np.array(child).shape)
-                    ind = self.reshape(child)
-                    #print('ind shape', ind.shape)
-                    ras = ind[:, :len(self.ra_list)]
-                    others = ind[:, len(self.ra_list):]
-                    if ras.sum(axis=1).any() > 0.275:
-                        for i in range(len(ras)):
-                            if ras[i, :].sum() > 0.275: # normalize
-                                ras[i, :] = 0.275*ras[i, :]/ras[i, :].sum()
-                    others[others==0] = 0.01
-                    others = others/others.sum(axis=1)[:, None] # normalize
-                    ra_payout = np.clip(child[0], 0, 0.3)
-                    ind[:, :len(self.ra_list)] = np.abs(ras)
-                    ind[:, len(self.ra_list):] = np.abs(others)  
+                    ind = self.rebalance(child)
+                    ra_payout = child[0]
                     child = creator.Individual(np.insert(ind.reshape(ind.size), 0, ra_payout)),
                 #print('ending checkbounds')
                 return offspring
@@ -672,8 +681,8 @@ class Portfolio(object):
         creator.create("Individual", list, fitness=creator.FitnessMin)
         
         toolbox = base.Toolbox()
-        #pool = multiprocessing.Pool()
-        #toolbox.register("map", pool.map)
+        pool = multiprocessing.Pool()
+        toolbox.register("map", pool.map)
         toolbox.register("individual_guess", self.initIndividual, creator.Individual)
         toolbox.register("population_guess", self.initPopulation, list, toolbox.individual_guess)
         
@@ -686,6 +695,7 @@ class Portfolio(object):
         
         toolbox.decorate("mate", self.checkBounds())
         toolbox.decorate("mutate", self.checkBounds())
+        
         def main(): #  This is necessary to enable multiprocessing.
             pop = toolbox.population_guess()        
             hof = tools.HallOfFame(maxsize=20)        
@@ -710,6 +720,7 @@ class Portfolio(object):
                                                      verbose=True)
             #print('before best_ind')
             best_ind = tools.selBest(pop, 1)[0]
+
             print("Best individual is %s, %s" % (best_ind, best_ind.fitness.values))
             self.best_ind = best_ind
             return pop, stats, hof, logbook, best_ind
@@ -741,9 +752,7 @@ class Portfolio(object):
         lns = line1 + line2
         labs = [l.get_label() for l in lns]
         ax1.legend(lns, labs, loc="best")
-        
-        plt.show()
-        
+       
     def mutatePyfin(self, individual, indpb, number_changed):
         
         '''
