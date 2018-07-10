@@ -859,12 +859,12 @@ class TFSA(Investment):
     
     def __init__(self,
                  initial,
-                 growth,
                  dob,
                  ytd,
                  ctd,
                  era,
                  le,
+                 growth=0,
                  inflation=5.5):
         
         '''
@@ -873,14 +873,18 @@ class TFSA(Investment):
         Parameters:
         ytd:    float. Year-to-date contribution, according to the tax year.
         ctd:    float. Total contr to date. 
+        growth: float. Annualized growth rate of investment. E.g. if 10 if 10%.
+                If not specified, the average annualized growth rate of the JSE
+                over a rolling window of similar length to the investment
+                horizon is used.
         '''
-        
+ 
         self.type = 'TFSA'        
         Investment.__init__(self, initial, growth)
         self.ctd = ctd
-        self.dob = pd.to_datetime(dob).date()   
         self.ytd = ytd
 
+        self.dob = pd.to_datetime(dob).date() 
 
         self.df = pd.DataFrame(index=pd.DatetimeIndex(start=pd.datetime.today().date(),
                                                       end=pd.datetime(self.dob.year + le, self.dob.month, self.dob.day),
@@ -905,11 +909,28 @@ class TFSA(Investment):
         
         self.inflation = inflation/100
         #  In real terms:
-        self.growth = (1 + self.growth)/(1 + self.inflation) - 1
 
         self.retirement_date = pd.datetime(self.dob.year + era, self.dob.month, self.dob.day)
         self.last_working_date = self.df.loc[self.df.index<=self.retirement_date].index[-1]
         self.first_retirement_date = self.df.loc[self.df.index>=self.retirement_date].index[0]
+        
+        self.retirement_date = pd.datetime(self.dob.year + era, self.dob.month, self.dob.day)
+        self.last_working_date = self.df.loc[self.df.index<=self.retirement_date].index[-1]
+        self.first_retirement_date = self.df.loc[self.df.index>=self.retirement_date].index[0]
+        
+        if growth == 0:
+            jse = pd.read_csv('JSE_returns.csv', index_col=0)
+            size = min(2017 - 1974, self.retirement_date.year - pd.datetime.today().year)
+            lst = []
+            for i in range(jse.shape[0] - size):
+                investment = 1
+                for j in jse['return'].iloc[i:i+size]:
+                    investment *= 1 + j
+                growth = 10**((1/size)*np.log10(investment)) - 1
+                lst += [growth]
+            self.growth = (1 + np.mean(lst))/(1 + self.inflation) - 1
+        else:
+            self.growth = (1 + self.growth)/(1 + self.inflation) - 1
            
     def calculateOptimalWithdrawal(self,
                                    contr,
@@ -1133,12 +1154,12 @@ class RA(Investment):
     
     def __init__(self,
                  initial,
-                 ra_growth,
-                 la_growth,
                  dob,
                  era,
                  le,
                  ytd,
+                 ra_growth=9.73,
+                 la_growth=0,
                  payout_fraction=1/3,
                  inflation=5.5):
         
@@ -1149,7 +1170,16 @@ class RA(Investment):
         Parameters:
         initial:            float. Value of RA at present time.
         ra_growth:          float. Growth rate of RA in percentage points. i.e. 13 = 13%.
+                            The default value is set at 13.73% - 4% fees, 
+                            which is the average of the annualised balanced 
+                            fund growths since inception for Allan Gray, Foord, 
+                            Old Mutual, Sanlam, Discovery, Absa, and 
+                            Coronation. The 4% fees is set to such a high
+                            number because if a person does not know the growth
+                            rate of the RA, they are probably paying high
+                            fees as well.
         la_growth:          float. Growth rate of LA (after payout) in percentage points. i.e. 13 = 13%.
+                            assigned a value of inflation + 1% if left unspecified.
         dob:                Pandas Datetime object. Date of birth.
         retirement_date:    Pandas Datetime object. Date of retirement, when RA is 
                             converted to living annuity.
@@ -1161,7 +1191,11 @@ class RA(Investment):
         self.type = 'RA'
         self.dob = pd.to_datetime(dob).date()
         self.ra_growth_overall = ra_growth/100
-        self.la_growth_overall = la_growth/100
+        if la_growth == 0:
+            self.la_growth_overall = (inflation + 1)/100
+        else:
+            self.la_growth_overall = la_growth/100
+
         
         self.inflation = inflation/100
         #  In real terms:
@@ -1326,19 +1360,17 @@ class DI(Investment):
     '''
     Discretionary Investment object.
     '''
-    #  TODO: Add fees
     
-    #@numba.jit
-
     def __init__(self,
                  initial,
-                 growth,
                  dob,
                  era,
                  le,
+                 growth=0,
                  inflation=5.5):
         
         Investment.__init__(self, initial, growth)
+     
         self.type = 'DI'
         self.dob = pd.to_datetime(dob).date()   
         self.df = pd.DataFrame(index=pd.DatetimeIndex(start=pd.datetime.today().date(),
@@ -1366,6 +1398,19 @@ class DI(Investment):
         self.first_retirement_date = self.df.loc[self.df.index>=self.retirement_date].index[0]
         self.last_working_date = self.df.loc[self.df.index<self.retirement_date].index[-1]
 
+        if growth == 0:
+            jse = pd.read_csv('JSE_returns.csv', index_col=0)
+            size = min(2017 - 1974, self.retirement_date.year - pd.datetime.today().year)
+            lst = []
+            for i in range(jse.shape[0] - size):
+                investment = 1
+                for j in jse['return'].iloc[i:i+size]:
+                    investment *= 1 + j
+                growth = 10**((1/size)*np.log10(investment)) - 1
+                lst += [growth]
+            self.growth = (1 + np.mean(lst))/(1 + self.inflation) - 1
+        else:
+            self.growth = (1 + self.growth)/(1 + self.inflation) - 1
     def _calculateQuick(self, arr, growth, withdrawal):
         
         '''Quick version of calculate, simply for determining optimal drawdown rate.
