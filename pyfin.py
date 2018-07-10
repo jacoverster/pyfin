@@ -24,7 +24,8 @@ class Portfolio(object):
                  medical_expenses,
                  era,
                  le,
-                 strategy='optimal'):
+                 strategy='optimal',
+                 inflation=5.5):
         '''
         Portfolio object, combining all investments.
         ------
@@ -56,6 +57,7 @@ class Portfolio(object):
         self.age = pd.datetime.today().date() - self.dob
         self.retirement_date = pd.datetime(self.dob.year + era, self.dob.month, self.dob.day)
         self.strategy = strategy
+        self.inflation = inflation/100
         
         self.investments = {}
         self.ra_list = []
@@ -210,6 +212,14 @@ class Portfolio(object):
         arr_ind = np.array(ind[1:])
         return arr_ind.reshape(int(arr_ind.size/(self.size)), self.size)
     
+    def NPV(self, amount, date):
+        n = date.year - self.this_year.year
+        return amount/(1 + self.inflation)**n
+    
+    def FV(self, amount, date):
+        n = date.year - self.this_year.year
+        return amount*(1 + self.inflation)**n    
+            
     #@numba.jit
     def fractionsToRands(self, ind):
         
@@ -376,19 +386,19 @@ class Portfolio(object):
         taxable_income = 0
         if s.name < self.retirement_date:
             if s.contr_RA <= 0.275*s.taxable_ibt and s.contr_RA <=350000:
-                taxable_income = s.taxable_ibt + 0.18*max(0, s.capital_gains - 40000) - s.contr_RA
+                taxable_income = s.taxable_ibt + self.NPV(0.18*max(0, s.capital_gains - self.FV(40000, s.name)), s.name) - s.contr_RA
             elif s.contr_RA > 0.275*s.taxable_ibt and s.contr_RA < 350000:
-                taxable_income = s.taxable_ibt - s.taxable_ibt*0.275 + 0.18*max(0, s.capital_gains - 40000)
+                taxable_income = s.taxable_ibt - s.taxable_ibt*0.275 + self.NPV(0.18*max(0, s.capital_gains - self.FV(40000, s.name)), s.name)
             else:
-                taxable_income = s.taxable_ibt - 350000 + 0.18*max(0, s.capital_gains - 40000)
+                taxable_income = s.taxable_ibt - 350000 + 0.18*max(0, s.capital_gains - self.NPV(40000, s.name))
 
         if s.name >= self.retirement_date:
             if age < 65:
-                taxable_income = max(0, s.taxable_ibt + 0.18*max(0, s.capital_gains - 40000) - 78150)
+                taxable_income = max(0, s.taxable_ibt + self.NPV(0.18*max(0, s.capital_gains - self.FV(40000, s.name)), s.name) - 78150)
             elif age < 75:
-                taxable_income = max(0, s.taxable_ibt + 0.18*max(0, s.capital_gains - 40000) - 121000)
+                taxable_income = max(0, s.taxable_ibt + self.NPV(0.18*max(0, s.capital_gains - self.FV(40000, s.name)), s.name) - 121000)
             else:
-                taxable_income = max(0, s.taxable_ibt + 0.18*max(0, s.capital_gains - 40000) - 135300)                
+                taxable_income = max(0, s.taxable_ibt + self.NPV(0.18*max(0, s.capital_gains - self.FV(40000, s.name)), s.name) - 135300)                
         
         tax = self.incomeTax(taxable_income, age)
         
@@ -472,14 +482,15 @@ class Portfolio(object):
         elif lump_sum > 990000:
             return 203400 + (lump_sum - 990000)*0.36
         '''
-        if lump_sum < 500000:
+        lump_sum_FV = self.FV(lump_sum, self.retirement_date)
+        if lump_sum_FV < self.FV(500000, self.retirement_date):
             return 0
-        elif lump_sum < 700000:
-            return (lump_sum - 500000)*0.18
-        elif lump_sum < 1050000:
-            return 36000 + (lump_sum - 700000)*0.27
-        elif lump_sum >= 1050000:
-            return 130500 + (lump_sum - 1050000)*0.36
+        elif lump_sum_FV < self.FV(700000, self.retirement_date):
+            return self.NPV((lump_sum_FV - self.FV(500000, self.retirement_date))*0.18, self.retirement_date)
+        elif lump_sum_FV < self.FV(1050000, self.retirement_date):
+            return self.NPV(self.FV(36000, self.retirement_date) + (lump_sum_FV - self.FV(700000, self.retirement_date))*0.27, self.retirement_date)
+        elif lump_sum_FV >= self.FV(1050000, self.retirement_date):
+            return self.NPV(self.FV(130500, self.retirement_date) + (lump_sum_FV - self.FV(1050000, self.retirement_date))*0.36, self.retirement_date)
         
     def plot(self):
         plt.figure(1)
@@ -1526,20 +1537,6 @@ class DI(Investment):
                 #                                                            self.growth)
                 self.df.loc[year, 'capital_gain'] = 0
                 
-            '''
-            if self.df.loc[year, 'withdrawals'] <= self.df.loc[year, 'capital']:
-                self.df.loc[year, 'capital'] -=  self.df.loc[year, 'withdrawals']             
-                self.df.loc[year, 'capital_gain'] = self.df.loc[previous_year, 'capital_gain'] + self.df.loc[previous_year, 'capital']*(self.growth)
-                if self.df.loc[year, 'capital'] > 0:
-                    self.df.loc[year, 'withdrawal_cg'] = self.df.loc[year, 'withdrawals']*(self.df.loc[year, 'capital_gain']/self.df.loc[year, 'capital'])
-                    self.df.loc[year, 'capital_gain'] -= self.df.loc[year, 'withdrawal_cg']
-                else:
-                    self.df.loc[year, 'withdrawal_cg'] = 0
-            else:
-                self.df.loc[year, 'withdrawals'] = self.df.loc[year, 'capital']
-                self.df.loc[year, 'withdrawal_cg'] = self.df.loc[year, 'capital_gain']
-                self.df.loc[year, 'capital'] = 0
-            '''
             previous_year = year  
             
 
