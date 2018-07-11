@@ -22,6 +22,7 @@ class Portfolio(object):
                  expenses,
                  ma_dependents,
                  medical_expenses,
+                 monthly_med_aid_contr,
                  era,
                  le,
                  strategy='optimal',
@@ -59,6 +60,7 @@ class Portfolio(object):
         self.retirement_date = pd.datetime(self.dob.year + era, self.dob.month, self.dob.day)
         self.strategy = strategy
         self.inflation = inflation/100
+        self.monthly_med_aid_contr = monthly_med_aid_contr
         
         self.uif_contr = 0
         if uif == True:
@@ -122,7 +124,7 @@ class Portfolio(object):
         self.number_working_years = self.df.loc[self.df.index<self.last_working_date].shape[0]
         self.number_retirement_years = self.df.loc[self.df.index>=self.last_working_date].shape[0]
         self.df.loc[:self.last_working_date, 'taxable_ibt'] = self.taxable_ibt
-        self.df.loc[:, 'age'] = (p.df.index - pd.Timestamp(p.dob)).days/365.25
+        self.df.loc[:, 'age'] = (self.df.index - pd.Timestamp(self.dob)).days/365.25
         
     def addInvestment(self, name, investment):  
         
@@ -198,7 +200,7 @@ class Portfolio(object):
                                      columns=np.arange(0, self.size))
 
         self.pop_size = 100
-        self.ngen = 20
+        self.ngen = 40
         self.GA()
         self.solution = self.fractionsToRands(self.reshape(self.best_ind))
 
@@ -410,7 +412,11 @@ class Portfolio(object):
         
         tax = self.incomeTax(taxable_income, age)
         
-        self.taxCreditMa(s.medical_expenses, taxable_income, age)    
+        self.tax_credit_ma = self.taxCreditMa(self.monthly_med_aid_contr,
+                                              self.ma_dependents,
+                                              s.medical_expenses,
+                                              taxable_income,
+                                              age)    
         return max(0, tax - self.tax_credit_ma)
     
     def taxableCapitalGains(self, amount, year):
@@ -455,43 +461,36 @@ class Portfolio(object):
              return  532041 + (taxable_income - 1500000)*0.45 - rebate
     
     #@numba.jit
-    def taxCreditMa(self, medical_expenses, taxable_income, age):
+    def taxCreditMa(self, 
+                    monthly_med_aid_contr, 
+                    ma_dependents,
+                    medical_expenses,
+                    taxable_income,
+                    age):
+        
         if age > 65:
-            if self.ma_dependents <=2:
-                ma_d_total = self.ma_dependents*310*12
+            if ma_dependents <=2:
+                ma_d_total = ma_dependents*310*12
             else:
-                ma_d_total = 620*12 + 12*(self.ma_dependents - 2)*209
+                ma_d_total = 620*12 + 12*(ma_dependents - 2)*209
             
-            self.tax_credit_ma = 0.33*(medical_expenses - 3*ma_d_total)
+            tax_credit_ma = ma_d_total\
+                                + 0.33*max(0, monthly_med_aid_contr*12 - 3*ma_d_total)\
+                                + 0.33*max(0, medical_expenses)
         else:
-            if self.ma_dependents <=2:
-                ma_d_total = self.ma_dependents*310
+            if ma_dependents <=2:
+                ma_d_total = ma_dependents*310
             else:
-                ma_d_total = 12*620 + 12*(self.ma_dependents - 2)*209
+                ma_d_total = 12*620 + 12*(ma_dependents - 2)*209
             
-            if medical_expenses > 0.075*taxable_income:
-                self.tax_credit_ma = ma_d_total + 0.25*(self.medical_expenses - 0.075*taxable_income)
-            else:
-                self.tax_credit_ma = ma_d_total
+            tax_credit_ma = ma_d_total \
+                                + 0.25*max(0, medical_expenses - 0.075*taxable_income)\
+                                + 0.25*max(0, monthly_med_aid_contr*12 - ma_d_total*4)
+        return tax_credit_ma
     
     #@numba.jit        
     def CGTRA(self, lump_sum):
-        '''
-        Calculates the Capital Gains Tax on Retirement Annuity lump sum payment
-        '''
-        
-        '''
-        Lump Sum Tax Benefits - not sure why this is different from the below?
-        
-        if lump_sum < 25000:
-            return 0
-        elif lump_sum <= 660000:
-            return lump_sum*0.18
-        elif lump_sum <= 990000:
-            return 114300 + (lump_sum - 660000)*0.27
-        elif lump_sum > 990000:
-            return 203400 + (lump_sum - 990000)*0.36
-        '''
+
         lump_sum_FV = self.FV(lump_sum, self.retirement_date)
         if lump_sum_FV < self.FV(500000, self.retirement_date):
             return 0
@@ -636,14 +635,13 @@ class Portfolio(object):
         ind_list=[]
         contr = self.taxEfficientIndividual()
         ind_list += [contr.reshape(contr.size)]   
-        for j in np.geomspace(1/20, 100, 30):            
-            contr = self.randomIndividual(j)
+        factor_list = np.geomspace(1/20, 100, 30)
+        for _ in range(30):
+            contr = self.randomIndividual(np.random.choice(factor_list))
             ind_list += [contr.reshape(contr.size)]            
             contr = self.taxEfficientIndividual()
             ind_list += [contr.reshape(contr.size)]    
-
-        for j in np.geomspace(1/20, 100, 30):            
-            contr = self.randomConstantIndividual(j)
+            contr = self.randomConstantIndividual(np.random.choice(factor_list))
             ind_list += [contr.reshape(contr.size)]
             contr = self.taxEfficientIndividual()
             ind_list += [contr.reshape(contr.size)]   
@@ -710,9 +708,9 @@ class Portfolio(object):
         population = toolbox.population_guess()
 
         toolbox.register("evaluate", self.fitness)
-        toolbox.register("mate", tools.cxOnePoint)
+        toolbox.register("mate", tools.cxTwoPoint)
         toolbox.register("mutate", self.mutatePyfin, indpb=0.9, number_changed=10)
-        toolbox.register("select", tools.selTournament, tournsize=5)
+        toolbox.register("select", tools.selTournament, tournsize=3)
         
         toolbox.decorate("mate", self.checkBounds())
         toolbox.decorate("mutate", self.checkBounds())
@@ -753,10 +751,9 @@ class Portfolio(object):
         fit_mins = [logbook[i]['min'] for i in range(len(logbook))]
         size_avgs = [logbook[i]['avg'] for i in range(len(logbook))]
         stds = [logbook[i]['std'] for i in range(len(logbook))]    
-    
+        plt.figure(0)
         plt.rcParams['font.family'] = "serif"
         plt.rcParams['font.size'] = 14
-        plt.figure(0)
         fig, ax1 = plt.subplots()
         line1 = ax1.plot(gen, fit_mins, "b-", label="Minimum Fitness")
         ax1.set_xlabel("Generation")
@@ -1604,10 +1601,11 @@ class DI(Investment):
 #%% Portfolio
 
 p = Portfolio(dob='1987-02-05',
-              ibt=60000*12,
+              ibt=60000,
               expenses=19000*12,
+              monthly_med_aid_contr=2583.18,
               ma_dependents=2,
-              medical_expenses=12000,
+              medical_expenses=9000,
               era=65,
               le=95,
               strategy='optimal')
