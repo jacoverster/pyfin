@@ -218,11 +218,11 @@ class Portfolio(object):
         return arr_ind.reshape(int(arr_ind.size/(self.size)), self.size)
     
     def NPV(self, amount, date):
-        n = date.year - self.this_year.year
+        n = date.year - self.this_year.year + 1
         return amount/(1 + self.inflation)**n
     
     def FV(self, amount, date):
-        n = date.year - self.this_year.year
+        n = date.year - self.this_year.year + 1
         return amount*(1 + self.inflation)**n    
             
     #@numba.jit
