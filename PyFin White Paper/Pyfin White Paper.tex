@@ -195,6 +195,9 @@ We assume that at retirement your RA is paid into a living annuity, not a guaran
 
 The model determines the optimal RA payout, once again for your mean annual income after tax during retirement, not necessarily the minimum tax in the RA payout year.
 
+\paragraph{UIF}
+SARS requires everyone to pay the minimum of 1\% of their gross income, or R148.72 per month to the Unemployment Insurance Fund. We therefore calculate this figure and subtract it from your income after tax.
+
 \paragraph{Growth, Dividends, and Fees}
 At the time of writing, PyFin only has one number: the annual growth in an investment product. We assume that this takes the fees, dividend reinvestments, etc. into account. It would be wonderful to consider platform, deposit, and other fees in the calculation. However, this will have to be added in a later version. 
 
@@ -218,7 +221,7 @@ For your personal information, you input your income before tax, your monthly ex
 \end{equation}
 
 \begin{equation}
-\textrm{Savable Income} = \textrm{Income after tax} - \textrm{expenses}.
+\textrm{Savable Income} = \textrm{Income after tax} - \textrm{expenses} - \textrm{UIF}.
 \end{equation}
 
 It allocates your RA contribution(s) before tax, and finds the optimal distribution of your savable income between your other savings vehicles. The output of the analysis will be a report that shows you how to allocate your funds, and how your capital is expected to grow. You will also get a spreadsheet showing all of the intermediate numbers, in case you are interested.
@@ -286,19 +289,20 @@ Annuity incomes will be taxed at these rates, with the age thresholds taken into
 \end{table}
 
 \subsection{Credits for Medical Expenses}
-If you are under 65, you get a tax credit of R310 per month for the first two dependents on your registered medical aid. You get R209 per month for every dependent after that. Also, 25\% of your medical expenses above 7.5\% of your annual taxable income, not covered by your medical aid, can be claimed back. So, if you earn R100~000 per year, 7.5\% of your taxable income is R7~500 per year. If your  medical expenses not covered by your medical aid are R10~000, you can claim 25\% of the R2~500 back, which would be R625. As you earn more, you need to have to be in quite deep trouble before SARS will give you some money back.
-If you are over 65, the ``inclusion rate'' (the 25\% above), goes up to 33\%.
+If you are under 65, you get a tax credit of R310 per month for the first two dependents on your registered medical aid. You get R209 per month for every dependent after that. Also, 25\% of your medical expenses above 7.5\% of your annual taxable income, not covered by your medical aid, can be claimed back. So, if you earn R100~000 per year, 7.5\% of your taxable income is R7~500 per year. If your  medical expenses not covered by your medical aid are R10~000, you can claim 25\% of the R2~500 back, which would be R625. You can also claim back 25\% of medical aid fees in excess of four times the credit. E.g. If your medical aid costs you R2000 per month, your can claim back R2000 - R310$\times$4 = R760. As you earn more, you need to have to be in quite deep trouble before SARS will give you some money back.
+
+If you are over 65, the ``inclusion rate'' (the 25\% above), goes up to 33\%, and the 7.5\% clause falls away. The 4$\times$ rule above also becomes a 3$\times$ rule.
 
 \subsection{RA Deduction}
-An individual may contribute up to 27.5\% of their income to an RA, so that this is deducted from their taxable income. In other words, if you earn R100~000 per year, and you put R27.5\% in an RA, your taxable income is R72~500, which puts you under the tax treshold. If you don't do it, you will be taxed 18\% of $R100~000-R78~150 = R21~850$, which is R3~933.
+An individual may contribute up to 27.5\% of their income to an RA, so that this is deducted from their taxable income. In other words, if you earn R100~000 per year, and you put R27.5\% in an RA, your taxable income is R72~500, which puts you under the tax threshold. If you don't do it, you will be taxed 18\% of $R100~000-R78~150 = R21~850$, which is R3~933.
 
 \subsection{Capital Gains Tax}
 SARS taxes you on the profit you make from buying and selling things like property or shares (excluding your primary residence).
 This works in the following way:
 \begin{equation} \label{eq:CGT}
-\textrm{Taxable Capital Gains} = 0.18\times(\textrm{Profit} - 40~000)
+\textrm{Taxable Capital Gains} = 0.4\times(\textrm{Profit} - 40~000)
 \end{equation}
-So if you buy shares for R1m and sell them for R2m, you have realised a capital gain of R1m. The first R40~000 in combined capital gains from all assets sold in any given tax year is tax free. So if this was the only capital gains your realised, SARS will consider a gain of R960~000. 18\% of this is R172~800. This sum is added to your taxable income, and taxed at the rate in which this puts your taxable income for the year. If you earn a lot, you may pay close to 45\% of this profit over to SARS. If you earn nothing, your taxable income would be R172~800, where you would pay 18\% tax on the amount above R78~150. As mentioned previously, SARS doesn't ``index'' CGT, so even simple inflation-growth is taxed in this way. Any growth from discretionary investments will attract capital gains tax according to this formula. However, for the lump sum payout of your RA, the exclusion is R500~000 instead of R40~000. The figures are shown in Table~\ref{tab:CGTRA}.
+So if you buy shares for R1m and sell them for R2m, you have realised a capital gain of R1m. The first R40~000 in combined capital gains from all assets sold in any given tax year is tax free. So if this was the only capital gains your realised, SARS will consider a gain of R960~000. 40\% of this is R384~000. This sum is added to your taxable income, and taxed at the rate in which this puts your taxable income for the year. If you earn a lot, you may pay close to 45\% of this profit over to SARS. If you earn nothing, your taxable income would be R384~000, where you would pay R65~583 + 0.31 $\times$ (384~000-305~850). As mentioned previously, SARS doesn't ``index'' CGT, so even simple inflation-growth is taxed in this way. Any growth from discretionary investments will attract capital gains tax according to this formula. However, for the lump sum payout of your RA, the exclusion is R500~000 instead of R40~000. The figures are shown in Table~\ref{tab:CGTRA}.
 
 Since capital gains tax is only realised at withdrawal, PyFin must track the capital gains component of an investment over time, which becomes tricky with monthly contributions and growth. We keep a record of monthly contributions as well as total additional growth for a given point in time, and calculate capital gains as
 \begin{equation}
@@ -343,9 +347,9 @@ The only exception to this rule is CGT, where some manipulation must be done. Si
 \begin{equation}
 \textrm{Capital Gains}_{n} = \textrm{Capital}\times(1+i)^{n} - \textrm{Capital}_0
 \end{equation}
-If the capital gains are realised by withdrawing the total amount, the exemption must be calculated. It is R40~000 in the 2019 tax year, and is assumed to grow with inflation\sidenote{The inclusion rate of 18\% is assumed to stay constant.}:
+If the capital gains are realised by withdrawing the total amount, the exemption must be calculated. It is R40~000 in the 2019 tax year, and is assumed to grow with inflation\sidenote{The inclusion rate of 40\% is assumed to stay constant.}:
 \begin{equation}
-\textrm{Taxable Capital Gains} = \frac{0.18\left(\textrm{Capital}_{n} - \textrm{Capital}_{0} - 40~000\times(1+f)^{n}\right)}{(1+f)^n}
+\textrm{Taxable Capital Gains} = \frac{0.4\left(\textrm{Capital}_{n} - \textrm{Capital}_{0} - 40~000\times(1+f)^{n}\right)}{(1+f)^n}
 \end{equation}
 The formula above should yield capital gains in present-value terms, so that they can be included with the present value taxable income, taxed using the 2019 tax brackets, as is the case for all other calculations.
 
