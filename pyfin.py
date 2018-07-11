@@ -25,7 +25,8 @@ class Portfolio(object):
                  era,
                  le,
                  strategy='optimal',
-                 inflation=5.5):
+                 inflation=5.5,
+                 uif=True):
         '''
         Portfolio object, combining all investments.
         ------
@@ -58,6 +59,10 @@ class Portfolio(object):
         self.retirement_date = pd.datetime(self.dob.year + era, self.dob.month, self.dob.day)
         self.strategy = strategy
         self.inflation = inflation/100
+        
+        self.uif_contr = 0
+        if uif == True:
+            self.uif_contr = min(148.72*12, 0.01*ibt)
         
         self.investments = {}
         self.ra_list = []
@@ -94,7 +99,6 @@ class Portfolio(object):
                         'capital_gains',
                         'age',
                         'date',
-                        'iat',
                         'withdrawals_total',
                         'withdrawals_RA',
                         'withdrawals_TFSA',
@@ -105,10 +109,10 @@ class Portfolio(object):
                         'contr_total',
                         'contr_total_at',
                         'savable_iat']] = 0
-                        
-        self.df.loc[:, 'age'] = (self.df.index - pd.Timestamp(self.dob)).days/365.25
-        self.df.loc[:, 'medical_expenses'] = medical_expenses
         
+        self.df.loc[:, 'iat'] = -self.uif_contr
+        self.df.loc[:, 'medical_expenses'] = medical_expenses
+
         self.df.loc[:, 'medical_expenses'] = medical_expenses
         self.df.loc[:, 'date'] = self.df.index
         
@@ -118,7 +122,8 @@ class Portfolio(object):
         self.number_working_years = self.df.loc[self.df.index<self.last_working_date].shape[0]
         self.number_retirement_years = self.df.loc[self.df.index>=self.last_working_date].shape[0]
         self.df.loc[:self.last_working_date, 'taxable_ibt'] = self.taxable_ibt
-
+        self.df.loc[:, 'age'] = (p.df.index - pd.Timestamp(p.dob)).days/365.25
+        
     def addInvestment(self, name, investment):  
         
         '''
@@ -316,7 +321,6 @@ class Portfolio(object):
         
         self.df.loc[:, ['taxable_ibt',
         'capital_gains',
-        'iat',
         'withdrawals_total',
         'withdrawals_RA',
         'withdrawals_TFSA',
@@ -327,6 +331,9 @@ class Portfolio(object):
         'contr_total',
         'contr_total_at',
         'savable_iat']] = 0
+                        
+        self.df.loc[:, 'iat'] = -self.uif_contr
+                        
         self.ra_payouts = 0      
         self.df.loc[:self.last_working_date, 'taxable_ibt'] = self.taxable_ibt
         
@@ -376,7 +383,8 @@ class Portfolio(object):
         Calculates total income tax.
         ------
         Parameters:
-        s:          Pandas Series. Containing columns capital_gains, income, contr_RA, taxable_ibt
+        s:          Pandas Series. Containing columns capital_gains, 
+                    contr_RA, taxable_ibt
         ------
         Returns:
         tax:                float. tax payable in a particular year
@@ -386,24 +394,27 @@ class Portfolio(object):
         taxable_income = 0
         if s.name < self.retirement_date:
             if s.contr_RA <= 0.275*s.taxable_ibt and s.contr_RA <=350000:
-                taxable_income = s.taxable_ibt + self.NPV(0.18*max(0, s.capital_gains - self.FV(40000, s.name)), s.name) - s.contr_RA
+                taxable_income = s.taxable_ibt + self.taxableCapitalGains(s.capital_gains, s.name) - s.contr_RA
             elif s.contr_RA > 0.275*s.taxable_ibt and s.contr_RA < 350000:
-                taxable_income = s.taxable_ibt - s.taxable_ibt*0.275 + self.NPV(0.18*max(0, s.capital_gains - self.FV(40000, s.name)), s.name)
+                taxable_income = s.taxable_ibt - s.taxable_ibt*0.275 + self.taxableCapitalGains(s.capital_gains, s.name)
             else:
-                taxable_income = s.taxable_ibt - 350000 + 0.18*max(0, s.capital_gains - self.NPV(40000, s.name))
+                taxable_income = s.taxable_ibt - 350000 + self.taxableCapitalGains(s.capital_gains, s.name)
 
         if s.name >= self.retirement_date:
             if age < 65:
-                taxable_income = max(0, s.taxable_ibt + self.NPV(0.18*max(0, s.capital_gains - self.FV(40000, s.name)), s.name) - 78150)
+                taxable_income = max(0, s.taxable_ibt + self.taxableCapitalGains(s.capital_gains, s.name))
             elif age < 75:
-                taxable_income = max(0, s.taxable_ibt + self.NPV(0.18*max(0, s.capital_gains - self.FV(40000, s.name)), s.name) - 121000)
+                taxable_income = max(0, s.taxable_ibt + self.taxableCapitalGains(s.capital_gains, s.name) - 121000)
             else:
-                taxable_income = max(0, s.taxable_ibt + self.NPV(0.18*max(0, s.capital_gains - self.FV(40000, s.name)), s.name) - 135300)                
+                taxable_income = max(0, s.taxable_ibt + self.taxableCapitalGains(s.capital_gains, s.name) - 135300)                
         
         tax = self.incomeTax(taxable_income, age)
         
         self.taxCreditMa(s.medical_expenses, taxable_income, age)    
         return max(0, tax - self.tax_credit_ma)
+    
+    def taxableCapitalGains(self, amount, year):
+        return self.NPV(0.4*max(0, amount - self.FV(40000, year)), year)
     
     #@numba.jit
     def incomeTax(self, taxable_income, age=64):
@@ -417,8 +428,7 @@ class Portfolio(object):
         ------
         Returns:
         income tax as float.
-        '''
-        
+        '''        
         if age < 65:
             rebate = 14067
         elif age < 75:
@@ -788,7 +798,11 @@ class Portfolio(object):
 
         return creator.Individual(np.insert(reshaped.reshape(reshaped.size), 0, ra_payout)),
         
-    def determineRAContr(self, ibt, RA_monthly_contr=0, age=64):
+    def determineRAContr(self,
+                         ibt,
+                         RA_monthly_contr=0,
+                         age=64,
+                         uif=True):
         
         '''
         Convenience function calculating how much your RA contr can be to the 
@@ -799,6 +813,7 @@ class Portfolio(object):
         Parameters:
         ibt:        Annual Income Before Tax 
         '''
+        
         if RA_monthly_contr == 0:
             RA_annual_contr = 0
             iat = 0
@@ -806,12 +821,12 @@ class Portfolio(object):
             while surplus > 0:
                 RA_annual_contr += 100
                 ibt_ara = ibt - RA_annual_contr            
-                iat = ibt_ara - self.incomeTax(ibt_ara, age)
+                iat = ibt_ara - self.incomeTax(ibt_ara, age) - self.uif_contr
                 surplus = iat - self.expenses
             
             RA_annual_contr -= 100
             ibt_ara = ibt - RA_annual_contr            
-            iat = ibt_ara - self.incomeTax(ibt_ara, age)
+            iat = ibt_ara - self.incomeTax(ibt_ara, age) - self.uif_contr
             surplus = iat - self.expenses
             RA_monthly_contr = RA_annual_contr/12
             iat_monthly = iat/12
@@ -824,7 +839,7 @@ class Portfolio(object):
         else:
             RA_annual_contr = RA_monthly_contr*12
             ibt_ara = ibt - RA_annual_contr            
-            iat = ibt_ara - self.incomeTax(ibt_ara, age)
+            iat = ibt_ara - self.incomeTax(ibt_ara, age) - self.uif_contr
             surplus = iat - self.expenses           
             iat_monthly = iat/12
             print('RA Debit order: \t\t\t\tR', round(RA_monthly_contr, 2))
