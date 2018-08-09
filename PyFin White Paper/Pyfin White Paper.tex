@@ -153,17 +153,17 @@
 
 \section{The Short Version}
 \subsection{Introduction}
-\paragraph{Background} This tool was inspired by a \href{https://justonelap.com/podcast-can-one-etf-rule/}{Fat Wallet Show podcast} on \href{http://justonelap.com}{JustOneLap}, which alerted us to the fact that investing optimally for our retirement is a really difficult problem. Although financial advisors can show that e.g. investing the full 27.5\% allowance in an RA~\sidenote{Retirement Annuity. The same goes for pension and provident funds} is not the most effective way to structure your savings\sidenote{See for example \href{https://www.fin24.com/Finweek/Investment/save-thousands-in-tax-by-diversifying-your-retirement-savings-20180110}{"Save thousands in tax by diversifying your retirement savings"}, By Danie Venter, published 10 January 2018 on Fin24}, it is very difficult to find the optimal allocation, given the tax implications now and at retirement. For example, the more I put in my RA now, the lower my taxable income, and the more I can save on the same salary. But it does mean that during retirement I'll be paying more income tax than I would if I had put the (admittedly less) money in DIs\sidenote{Discretionary Investments. Unit trusts, ETFs, etc. See \href{http://www.stealthywealth.co.za/2018/05/i-love-capital-gains-tax.html}{this} Stealthy Wealth article on CGT vs income tax, and why you rather want to pay CGT. But there's also the CGT-inflation problem, as discussed later in this paper under \ref{tax rules}{Tax Rules}.}. But DIs tend to grow better than RAs, if only due to lower fees. So how should one split one's savings?  At Invoke Analytics we solve problems like these by using mathematical algorithms, machine learning, and statistics, and decided to try our hand at it. The result is PyFin.
+\paragraph{Background} This tool was inspired by a \href{https://justonelap.com/podcast-can-one-etf-rule/}{Fat Wallet Show podcast} on \href{http://justonelap.com}{JustOneLap}, which alerted us to the fact that investing optimally for our retirement is a really difficult problem. Although financial advisors can show that e.g. investing the full 27.5\%\sidenote{Of your taxable income} allowance in an RA~\sidenote{Retirement Annuity. Pension funds also allow you to withdraw up to a third as a lump sum. If you have a provident fund, you may withdraw everything as a lump sum, although those laws are changing. PyFin does not accommodate Provident fund rules at the moment.} is not the most effective way to structure your savings\sidenote{See for example \href{https://www.fin24.com/Finweek/Investment/save-thousands-in-tax-by-diversifying-your-retirement-savings-20180110}{"Save thousands in tax by diversifying your retirement savings"}, By Danie Venter, published 10 January 2018 on Fin24}, it is very difficult to find the optimal allocation, given the tax implications now and at retirement. For example, the more I put in my RA now, the lower my taxable income, and the more I can save on the same salary. But it does mean that during retirement I'll be paying more income tax than I would if I had put the (admittedly less) money in DIs\sidenote{Discretionary Investments. Unit trusts, Exchange Traded Funds (ETFs), etc. See \href{http://www.stealthywealth.co.za/2018/05/i-love-capital-gains-tax.html}{this} Stealthy Wealth article on CGT vs income tax, and why you rather want to pay CGT. But there's also the CGT-inflation problem, as discussed later in this paper under \ref{tax rules}{Tax Rules}.}. But DIs tend to grow better than RAs, if only due to lower fees. So how should one split one's savings?  At Invoke Analytics we solve problems like these by using mathematical algorithms, machine learning, and statistics, and decided to try our hand at it. The result is PyFin.
 
-\paragraph{Points to note} \newthought{Pyfin was written by engineers} to support our personal finance decisions. Although we spoke to tax practitioners and did tests to ensure that we implemented the tax rules correctly, there are no guarantees. Use it at your own risk, it doesn't constitute financial advice, etc. etc. Actually, if you spot a mistake, please let us know!\sidenote{Changes can be requested on \href{https://gitlab.com/invokeanalytics/pyfin}{Gitlab} by raising an issue (for programmers), or simply by email Herman at herman@invokeanalytics.co.za}
+\paragraph{Points to note} \newthought{Pyfin was written by engineers} to support our personal finance decisions. Although we spoke to tax practitioners\sidenote{Special thanks to Ineke Joubert (CA(SA) and Tyron Reinecke (CFA) for patiently reading the first draft of this white paper in their spare time. Any errors in this document or code are wholly attributable to Herman and not to them.} and did tests to ensure that we implemented the tax rules correctly, there are no guarantees. Use it at your own risk, it doesn't constitute financial advice, etc. etc. Actually, if you spot a mistake, please let us know!\sidenote{Changes can be requested on \href{https://gitlab.com/invokeanalytics/pyfin}{Gitlab} by raising an issue (for programmers), or simply by email Herman at herman@invokeanalytics.co.za}
 
 \newthought{Saving large amounts of money} in any of these vehicles will leave you with, well, large amounts of money\sidenote{Provided you use a low fee, high growth vehicle such as ETFs via \href{www.easyequities.co.za}{Easy Equities}}. There are better and worse ways to do it, of course, and that's where PyFin comes in. But the key is to save a lot. The calculator can only work with the money you're willing to put away. Living frugally and saving a lot will leave you richer (and probably happier) than living large and saving whatever is left, optimally.\sidenote{We've tried many budgeting apps to help us get a handle on this. None of them have really worked, except for \href{https://22seven.com/}{22seven}.}
 
-\newthought{"Year zero", when your funds run out}, is extremely sensitive to the withdrawal rate. If you withdraw too much or the investments underperform, you could run out of money years before your life expectancy. The ``4\% rule'' says that backtested over the last hundred years, withdrawing 4\% of capital per year from an investment will ensure that you preserve your capital\sidenote{E.g., see \href{http://www.stealthywealth.co.za/2016/06/what-is-4-rule-for-retirement.html}{this} Stealthy Wealth article}. Therefore PyFin has two settings: capital preservation, and income maximisation. With capital preservation, it will withdraw 4\% per year during retirement. With income maximisation, it will withdraw as much as it can to give you a steady income until your life expectancy. So it aims to have zero capital in the year of your death. These the withdrawal rates are often above 4\%, depending on your retirement age and life expectancy. Bear that in mind.
+\newthought{"Year zero", when your funds run out}, is extremely sensitive to the withdrawal rate. If you withdraw too much or the investments underperform, you could run out of money years before your life expectancy. The ``4\% rule'' says that backtested over the last hundred years, withdrawing 4\% of capital per year from an investment will ensure that you preserve your capital\sidenote{E.g., see \href{http://www.stealthywealth.co.za/2016/06/what-is-4-rule-for-retirement.html}{this} Stealthy Wealth article}. Therefore PyFin has two settings: capital preservation, and income maximisation. With capital preservation, it will withdraw 4\% per year during retirement. With income maximisation, it will withdraw as much as it can to give you a steady income until your life expectancy. So it aims to have zero capital in the year of your death. These withdrawal rates are often above 4\%, depending on your retirement age and life expectancy. Bear that in mind.
 
 \newthought{PyFin's objective is to maximise your mean retirement income after tax}, not to minimize the tax you pay. These two numbers are related, but not identical. The algorithm tries to structure your investments in such a way that your money works for you in the most effective way possible. However, the solutions may be counter-intuitive. It may seem that you pay less tax by sticking to the R33k TFSA limit and using your 27.5\% RA allowance. However, these have tax implications later in life, which may overshadow the tax benefits now (depending on the growth of the investments). 
 
-\newthought{PyFin won't restructure your existing investments}. It will only allocate future investments considering what you have already. You can't restructure your RA anyway, but you could with your TFSA and DIs. The cheapest way generally is to just alter future contributions.
+\newthought{PyFin won't restructure your existing investments}. It will only allocate future investments considering what you already have. You can't restructure your RA anyway, but you could with your TFSA and DIs. The cheapest way generally is to just alter future contributions.
 
 \newthought{PyFin doesn't derisk your investments as you get older}. As you get closer to retirement, the theory states that you want to gradually move your investments to lower risk vehicles such as bonds and cash, and away from equity, so that you don't withdraw a disproportionate amount if you retire during a market crash. At present PyFin considers capital growth and taxes, not the inherent risk or volatility of equity vs cash vs bonds. This could be built in at a later stage. However, we are not sure if you really want all your money in low-risk vehicles on your retirement date anyway. Most people will live for another 20 years after retirement, and some more. Having three years' worth of bonds as a backup for when markets crash probably a good idea, so that you don't have to cash in your equity investments during that time. But putting all of your money in low-growth ``safe'' investments is probably sub-optimal. Furthermore, most RAs derisk automatically, so that by the time you retire, your RA portfolio is already mostly in cash and bonds anyway. What we would do to get around this current PyFin limitation is to include a bonds ETF debit order as part of our expenses for a few years before retirement. Once again, this is not investment advice; it just reflects the approach with which the calculator was written.
 
@@ -196,7 +196,7 @@ We assume that at retirement your RA is paid into a living annuity, not a guaran
 The model determines the optimal RA payout, once again for your mean annual income after tax during retirement, not necessarily the minimum tax in the RA payout year.
 
 \paragraph{UIF}
-SARS requires everyone to pay the minimum of 1\% of their gross income, or R148.72 per month to the Unemployment Insurance Fund. We therefore calculate this figure and subtract it from your income after tax.
+SARS requires ``employees'' to pay the minimum of 1\% of their remuneration\sidenote{Remuneration is a technical term to SARS. We take it as your income before tax, during your pre-retirement years. Not a perfect definition, but good enough for the purposes of the calculation.}, or R148.72 per month to the Unemployment Insurance Fund. We therefore calculate this figure and subtract it from your income after tax.
 
 \paragraph{Growth, Dividends, and Fees}
 At the time of writing, PyFin only has one number: the annual growth in an investment product. We assume that this takes the fees, dividend reinvestments, etc. into account. It would be wonderful to consider platform, deposit, and other fees in the calculation. However, this will have to be added in a later version. 
@@ -229,6 +229,84 @@ It allocates your RA contribution(s) before tax, and finds the optimal distribut
 %The first thing to expect is that you will be taking financial advice from a computer, which feels a bit weird. You could try to be fancy and call it a ``Robo-advisor'' or ``AI'' the way OUTvest and other financial services companies' marketing departments do, but that's just smoke and mirrors. It is not a physical robot, and it is not AI. But it is still a computer program. Of course a lot of human expertise, thought, and care went into building the program, but you may still be uncomfortable investing money, possibly in counter-intuitive ways, on the advice from a calculator. It feels weird to us too. The best advice we have is to check the answers. Try to come up with a better solution yourself by trying different plans. This will give you a feel for the numbers.
 
 Due to the nature of the Genetic Algorithm there might be some jitter on the long-term contributions. We suggest that you use your good judgement and smooth these over in your actual contributions if you think that it is just noise.
+\begin{table}[bt]
+	\centering
+	\caption{Parameters needed for Portfolio Calculation. Note that default values can be changed by the user.}
+	\label{tab:PortfolioParameters}
+	\begin{tabular}{lccc}
+		\toprule
+	\textbf{Variable} 												& \textbf{Default} \\ 
+			\midrule
+	Date of Birth 										&  Supplied by User\\ 
+	Income Before Tax 								&  Supplied by User\\ 
+	Monthly Expenses							&  Supplied by User\\ 
+	Annual Medical Expenses						&  Supplied by User\\ 
+	Medical Aid Monthly Contributions	&  Supplied by User\\ 
+	Expected Retirement Age					&65\\
+	Life Expectancy										&95\\
+	Strategy												&''Optimal''\\
+	Inflation													&5.5\\
+	UIF															&True\\ 
+	\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[tb]
+	\centering
+	\caption{Parameters needed for TFSA Calculation. Note that default values can be changed by the user.}
+	\label{tab:TFSAParameters}
+	\begin{tabular}{lccc}
+		\toprule
+		\textbf{Variable} 												& \textbf{Default} \\ 
+		\midrule
+		Date of Birth 										&  Supplied by User\\ 
+		Current Balance 								&  Supplied by User\\ 
+		Year to Date Contribution							&  Supplied by User\\ 
+		Total Contributions						&  Supplied by User\\ 
+		Expected Retirement Age	&  65\\ 
+		Life Expectancy										&95\\
+		Growth												&13.73\%\\
+		Inflation													&5.5\%\\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\begin{table}[bt]
+	\centering
+	\caption{Parameters needed for RA Calculation. Note that default values can be changed by the user.}
+	\label{tab:RAParameters}
+	\begin{tabular}{lccc}
+		\toprule
+		\textbf{Variable} 												& \textbf{Default} \\ 
+		\midrule
+		Date of Birth 										&  Supplied by User\\ 
+		Current Balance 								&  Supplied by User\\ 
+		Year to Date Contribution							&  Supplied by User\\ 
+		RA Growth						&  9.73\%\\ 
+		LA Growth	&  inflation + 1\%\\ 
+		Payout Fraction									&1/3\\
+		Capital Gains to date & 0\\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\begin{table}[b]
+	\centering
+	\caption{Parameters needed for DI Calculation. Note that default values can be changed by the user.}
+	\label{tab:DIParameters}
+	\begin{tabular}{lccc}
+		\toprule
+		\textbf{Variable} 												& \textbf{Default} \\ 
+		\midrule
+		Date of Birth 										&  Supplied by User\\ 
+		Expected Retirement Age 				& Supplied by User\\
+		Current Balance								&  Supplied by User\\ 
+		Growth						&  18\%\\ 
+		Inflation									&5.5\%\\
+		Capital Gains to Date & 0\\
+		\bottomrule
+	\end{tabular}
+\end{table}
 
 \subsection{Behind  the scenes: How the Optimization Works}
 \newthought{Nerd Alert: we describe the algorithm in layman's terms, although some may disagree with ``layman's''...} 
@@ -240,7 +318,7 @@ There are many heuristic methods, most of which are inspired by natural processe
 \newpage
 \section{The Tax Details}
 
-\textit{This section has been written to reflect our (mis)understanding of how tax works. We include this deliberately so that the reader may identify shortcomings in the calculation. Bear in mind that even if the tax laws are described correctly below, it does not mean that the code does the same thing. We've made every effort to ensure reliable results, though.\sidenote{Changes can be requested on \href{https://gitlab.com/invokeanalytics/pyfin}{Gitlab} by raising an issue (for programmers), or simply by email Herman at herman@invokeanalytics.co.za}}\\\\
+\textit{This section has been written to reflect our (mis)understanding of how tax works. We include this deliberately so that the reader may identify shortcomings in the calculation. Bear in mind that even if the tax laws are described correctly below, it does not mean that the code does the same thing. We've made every effort to ensure reliable results, though.\sidenote{Changes can be requested on \href{https://gitlab.com/invokeanalytics/pyfin}{GitLab} by raising an issue (for programmers), or simply by emailing Herman at herman@invokeanalytics.co.za}}\\\\
 For the purposes of this calculation there are two main kinds of taxes payable by individuals in South Africa: income tax, and capital gains tax. There are also a few cases where one can obtain tax deductions. The only one taken into account in PyFin (at present) is medical aid and medical expenses.
 
 \subsection{Tax Brackets}
@@ -297,8 +375,8 @@ If you are over 65, the ``inclusion rate'' (the 25\% above), goes up to 33\%, an
 An individual may contribute up to 27.5\% of their income to an RA, so that this is deducted from their taxable income. In other words, if you earn R100~000 per year, and you put R27.5\% in an RA, your taxable income is R72~500, which puts you under the tax threshold. If you don't do it, you will be taxed 18\% of $R100~000-R78~150 = R21~850$, which is R3~933.
 
 \subsection{Capital Gains Tax}
-SARS taxes you on the profit you make from buying and selling things like property or shares (excluding your primary residence).
-This works in the following way:
+SARS taxes you on the profit you make from buying and selling things like property or shares (excluding your primary residence). For our purposes this would be discretionary investments: unit trusts and ETFs.
+CGT works in the following way:
 \begin{equation} \label{eq:CGT}
 \textrm{Taxable Capital Gains} = 0.4\times(\textrm{Profit} - 40~000)
 \end{equation}
@@ -308,6 +386,9 @@ Since capital gains tax is only realised at withdrawal, PyFin must track the cap
 \begin{equation}
 \textrm{Capital Gains} = \textrm{Withdrawal sum}\times\frac{\textrm{Growth}}{\textrm{Capital contributed}}.
 \end{equation}
+
+\subsection{Lump Sum Withdrawals from RAs}
+Capital Gains Tax is not applicable to lump sum payouts from RAs, pension funds, or provident funds. These are governed by a different set of tax laws. There are rules for if you withdraw a sum before retirement, which we assume does not happen, and when you withdraw a sum at retirement, as described in Table~\ref{tab:CGTRA}.
 
 \begin{table}[]
 	\centering
@@ -324,6 +405,9 @@ Since capital gains tax is only realised at withdrawal, PyFin must track the cap
 		\bottomrule
 	\end{tabular}
 \end{table}
+
+\subsection{Discretionary Investments}
+By discretionary investments, we mean unit trusts and Electronically Traded Funds (ETFs). These attract CGT when withdrawn.
 
 \subsection{Annual to Monthly Conversion}
 The contributions, withdrawals, capital growth, capital gains, etc. are stored on an annual basis, but the calculations assume that these are divided into twelve equal portions. To convert from annual to monthly interest, the following formula is used:
