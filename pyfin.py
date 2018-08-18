@@ -39,6 +39,7 @@ class Portfolio(object):
         medical_expenses:   float. Annual out-of-pocket medical expenses
         era:                int. Expected Retirement Age.
         le:                 int. life expectancy.
+        uif:                bool. Whether Unemployment Insurance Fund contributions are applicable.
         '''
         
         self.dob = pd.to_datetime(dob).date()
@@ -112,7 +113,7 @@ class Portfolio(object):
                         'contr_total_at',
                         'savable_iat']] = 0
         
-        self.df.loc[:, 'iat'] = -self.uif_contr
+        self.df.loc[:, 'iat'] = 0
         self.df.loc[:, 'medical_expenses'] = medical_expenses
 
         self.df.loc[:, 'medical_expenses'] = medical_expenses
@@ -120,6 +121,8 @@ class Portfolio(object):
         
         self.this_year = self.df.index[0]
         self.last_working_date = self.df.loc[self.df.index<self.retirement_date].index[-1]
+        self.df.loc[:self.last_working_date, 'iat'] = -self.uif_contr
+
         self.first_retirement_date = self.df.loc[self.df.index<self.retirement_date].index[-1]
         self.number_working_years = self.df.loc[self.df.index<self.last_working_date].shape[0]
         self.number_retirement_years = self.df.loc[self.df.index>=self.last_working_date].shape[0]
@@ -230,7 +233,7 @@ class Portfolio(object):
     def fractionsToRands(self, ind):
         
         '''
-        converts fractions saved into Rands saved.
+        converts fractions saved into Rands saved. It does so for all years at once.
         ------
         Parameters:     
         ind:            ndarray. Numpy array of size [self.number_working_years + number_retirement_years, self.size]
@@ -249,6 +252,7 @@ class Portfolio(object):
             tax[i] = self.totalTax(taxSeries)
         
         savable_income = np.maximum(0, self.taxable_ibt - ra_contr - tax - self.uif_contr - self.expenses)
+        savable_income[self.number_working_years:] = np.maximum(0, savable_income[self.number_working_years] - self.uif_contr)
         mask = np.ones_like(savable_income)
         mask[savable_income <= 0] = 0
         contr[:, :len(self.ra_list)] = mask[:, None]*self.taxable_ibt*np.array(ind[1:, :len(self.ra_list)])
@@ -308,7 +312,7 @@ class Portfolio(object):
         'contr_total_at',
         'savable_iat']] = 0
                         
-        self.df.loc[:, 'iat'] = -self.uif_contr
+        self.df.loc[:self.last_working_date, 'iat'] = -self.uif_contr
                         
         self.ra_payouts = 0      
         self.df.loc[:self.last_working_date, 'taxable_ibt'] = self.taxable_ibt
@@ -644,7 +648,11 @@ class Portfolio(object):
                     ras_sum = ras.sum(axis=1)
                     #print(ras_sum[i])
                     tax = self.incomeTax(self.taxable_ibt - ras_sum[i]*self.taxable_ibt)
-                    savable_income = self.taxable_ibt - tax - self.uif_contr - self.expenses*12 - ras_sum[i]*self.taxable_ibt
+                    if i <= self.number_working_years:
+                        savable_income = self.taxable_ibt - tax - self.uif_contr - self.expenses*12 - ras_sum[i]*self.taxable_ibt
+                    else:
+                        savable_income = self.taxable_ibt - tax - self.uif_contr - self.expenses*12 - ras_sum[i]*self.taxable_ibt
+
                     ras[i, :] -= 0.01
                 #print('savable_income', savable_income)
                 if ras[i, :] < 0:
@@ -687,8 +695,8 @@ class Portfolio(object):
         creator.create("Individual", list, fitness=creator.FitnessMin)
         
         toolbox = base.Toolbox()
-        pool = multiprocessing.Pool()
-        toolbox.register("map", pool.map)
+        #pool = multiprocessing.Pool()
+        #toolbox.register("map", pool.map)
         toolbox.register("individual_guess", self.initIndividual, creator.Individual)
         toolbox.register("population_guess", self.initPopulation, list, toolbox.individual_guess)
         
