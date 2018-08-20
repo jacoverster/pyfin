@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.16 (TeX Live 2015/Debian) (preloaded format=pdflatex 2017.8.23)  19 JUL 2018 10:39
+This is pdfTeX, Version 3.14159265-2.6-1.40.16 (TeX Live 2015/Debian) (preloaded format=pdflatex 2018.7.28)  20 AUG 2018 15:16
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -874,7 +874,7 @@ LaTeX Font Info:    Font shape `T1/pplj/bx/n' in size <10> not available
 LaTeX Warning: Marginpar on page 6 moved.
 
 [6] [7]
-Underfull \hbox (badness 10000) in paragraph at lines 321--323
+Underfull \hbox (badness 10000) in paragraph at lines 323--325
 
  []
 
@@ -886,12 +886,12 @@ LaTeX Warning: Marginpar on page 8 moved.
 
 
 LaTeX Warning: No positions in optional float specifier.
-               Default added (so using `tbp') on input line 354.
+               Default added (so using `tbp') on input line 356.
 
 [8] [9]
 
 LaTeX Warning: No positions in optional float specifier.
-               Default added (so using `tbp') on input line 393.
+               Default added (so using `tbp') on input line 395.
 
 [10]
 
@@ -904,23 +904,23 @@ LaTeX Warning: Marginpar on page 11 moved.
 LaTeX Warning: Marginpar on page 11 moved.
 
 
-Overfull \hbox (7.50307pt too wide) detected at line 437
+Overfull \hbox (7.50307pt too wide) detected at line 439
 [][] \OT1/zplm/m/n/10 = [][]
  []
 
 [11]
-LaTeX Font Info:    Try loading font information for T1+fvm on input line 442.
+LaTeX Font Info:    Try loading font information for T1+fvm on input line 444.
  (/usr/share/texlive/texmf-dist/tex/latex/bera/t1fvm.fd
 File: t1fvm.fd 2004/09/07 scalable font definitions for T1/fvm.
 )
 LaTeX Font Info:    Font shape `T1/fvm/m/n' will be
-(Font)              scaled to size 8.50006pt on input line 442.
+(Font)              scaled to size 8.50006pt on input line 444.
 Package microtype Info: Loading generic settings for font family
 (microtype)             `fvm' (encoding: T1).
 (microtype)             For optimal results, create family-specific settings.
 (microtype)             See the microtype manual for details.
 
-Overfull \hbox (2.36871pt too wide) in paragraph at lines 444--445
+Overfull \hbox (2.36871pt too wide) in paragraph at lines 446--447
 \T1/pplj/m/sc/10/50ls (-20) calculateOptimalWithdrawal \T1/pplj/m/n/10 (-20) ca
 l-cu-lates the op-ti-mal with-drawal
  []
@@ -930,20 +930,20 @@ Package bibentry Warning: You have used \nobibliography*
 (bibentry)                without a following \bibliography.
 (bibentry)                You may not be able to run BibTeX.
 
-Package atveryend Info: Empty hook `BeforeClearDocument' on input line 484.
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 486.
 [12]
-Package atveryend Info: Empty hook `AfterLastShipout' on input line 484.
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 486.
  (./Pyfin White Paper.aux)
-Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 484.
-Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 484.
+Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 486.
+Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 486.
 Package rerunfilecheck Info: File `"Pyfin White Paper".out' has not changed.
 (rerunfilecheck)             Checksum: 94B5F75074BBE8BA5D7590849D0A2730;511.
-Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 484.
+Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 486.
  ) 
 Here is how much of TeX's memory you used:
  14897 strings out of 493029
  215733 string characters out of 6136234
- 451404 words of memory out of 5000000
+ 451405 words of memory out of 5000000
  17651 multiletter control sequences out of 15000+600000
  85289 words of font info for 438 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
@@ -958,7 +958,7 @@ lrij8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/bera/fvmr8a.pfb></
 usr/share/texlive/texmf-dist/fonts/type1/urw/palatino/uplb8a.pfb></usr/share/te
 xlive/texmf-dist/fonts/type1/urw/palatino/uplr8a.pfb></usr/share/texlive/texmf-
 dist/fonts/type1/urw/palatino/uplri8a.pfb>
-Output written on "Pyfin White Paper.pdf" (12 pages, 152772 bytes).
+Output written on "Pyfin White Paper.pdf" (12 pages, 152050 bytes).
 PDF statistics:
  196 PDF objects out of 1000 (max. 8388607)
  170 compressed objects within 2 object streams
