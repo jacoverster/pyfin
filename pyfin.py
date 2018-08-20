@@ -26,6 +26,7 @@ class Portfolio(object):
                  era=65,
                  le=95,
                  strategy='optimal',
+                 optimizer='PSO',
                  inflation=5.5,
                  uif=True):
         '''
@@ -34,7 +35,7 @@ class Portfolio(object):
         Parameters:
         dob:                str. Date of Birth, in format "YYYY-MM-DD"
         ibt:                int. Annual income before tax
-        expenses:           float. Expenses before tax
+        expenses:           float. Expenses before tax, monthly
         ma_dependents:      int. Number of medical aid dependants, including self.
         medical_expenses:   float. Annual out-of-pocket medical expenses
         era:                int. Expected Retirement Age.
@@ -59,6 +60,10 @@ class Portfolio(object):
         self.size = 0
         self.age = pd.datetime.today().date() - self.dob
         self.retirement_date = pd.datetime(self.dob.year + era, self.dob.month, self.dob.day)
+        self.optimizer = optimizer
+        if pd.datetime.today()>self.retirement_date:
+            raise AttributeError('This calculator only works pre-retirement. You have specified a retirement date in the past.')
+        
         self.strategy = strategy
         self.inflation = inflation/100
         self.monthly_med_aid_contr = monthly_med_aid_contr
@@ -183,28 +188,24 @@ class Portfolio(object):
         
         '''
         Optimises the investment allocations of the portfolio over time.
-        ------
-        Parameters:
-        strategy:           str. 'optimal', 'safe'. The method by which the 
-                            withdrawals are calculated. If 'optimal' is chosen, 
-                            the withdrawal rate resulting in zero capital at 
-                            life expectancy is found for each investment. This 
-                            is the maximum sustainable annual amount that can 
-                            be withdrawn from the investment. If 'safe' is 
-                            selected, a drawdown of 4% is used - proven to be 
-                            sustainable indefinitely.
         '''
         
         time1 = time.time()
-        import scipy.optimize as spm
+        #import scipy.optimize as spm
           
         self.contr = pd.DataFrame(index=self.df.index,
                                      columns=np.arange(0, self.size))
 
-        self.pop_size = 100
-        self.ngen = 20
-        self.GA()
-        self.solution = self.fractionsToRands(self.reshape(self.best_ind))
+        if self.optimizer == 'GA':
+            self.pop_size = 100
+            self.ngen = 20
+            self.GA()
+            self.solution = self.fractionsToRands(self.reshape(self.best_ind))
+
+        if self.optimizer == 'PSO':
+            
+            self.pso()
+            self.solution = self.fractionsToRands(self.reshape(self.best_ind))
 
         for count, i in enumerate(self.investments.keys()):
             self.contr.loc[:, count] = self.solution[:, count]
@@ -240,10 +241,10 @@ class Portfolio(object):
         ------
         Returns:        ndarray. Same shape as input. Just with Rand values.
         '''
-        contr = np.zeros_like(ind[1:]) #  exclude RA payout fraction (first item in arr)
-        ra_contr = self.taxable_ibt*ind[1:, :len(self.ra_list)].sum(axis=1)
+        contr = np.zeros_like(ind) #  exclude RA payout fraction (first item in arr)
+        ra_contr = self.taxable_ibt*ind[:, :len(self.ra_list)].sum(axis=1)
         tax = np.zeros(len(contr))
-        for i, year in enumerate(self.df.index[1:]):
+        for i, year in enumerate(self.df.index[:]):
             taxSeries = pd.Series({'taxable_ibt': self.taxable_ibt,
                             'contr_RA': ra_contr[i],
                             'capital_gains': 0,
@@ -255,8 +256,8 @@ class Portfolio(object):
         savable_income[self.number_working_years:] = np.maximum(0, savable_income[self.number_working_years] - self.uif_contr)
         mask = np.ones_like(savable_income)
         mask[savable_income <= 0] = 0
-        contr[:, :len(self.ra_list)] = mask[:, None]*self.taxable_ibt*np.array(ind[1:, :len(self.ra_list)])
-        contr[:, len(self.ra_list):] = savable_income[:, None]*np.array(ind[1:, len(self.ra_list):])
+        contr[:, :len(self.ra_list)] = mask[:, None]*self.taxable_ibt*np.array(ind[:, :len(self.ra_list)])
+        contr[:, len(self.ra_list):] = savable_income[:, None]*np.array(ind[:, len(self.ra_list):])
         return contr
 
         
@@ -279,8 +280,9 @@ class Portfolio(object):
                         period.
                         
         '''
-        scenario = self.fractionsToRands(self.rebalance(individual))
-        ra_payout_frac = individual[0]
+        self.individual = individual
+        fracs, ra_payout_frac = self.rebalance(individual)
+        scenario = self.fractionsToRands(fracs)
         self.contr.loc[:, self.contr.columns] = scenario
         for count, i in enumerate(self.investments.keys()):
             self.investments[i].calculateOptimalWithdrawal(self.contr.loc[:, count],
@@ -292,6 +294,46 @@ class Portfolio(object):
             return round(-self.df.loc[self.retirement_date:, 'iat'].mean(), 2) #+ penalty_oversaved, 2)
         elif self.strategy == 'safe':
             return round(-self.df.loc[self.retirement_date:, 'iat'].mean(), 2) #+ penalty_oversaved, 2)
+
+    def pso_objective(self, individuals):
+        '''
+        Objective Function for optimization. 
+        ------
+        Parameters:
+        scenario_1d:    ndarray. 1D Numpy array. This is a reshaped form of an
+                        array of dimension [working months + retirement months, 2*portfolio size]
+                        where the values are fractions. The first len(self.ra_list)
+                        columns are retirement annuities. These fractions are 
+                        fractions of the total income before tax allocated to the
+                        retirement annuity. The rest of the columns are from
+                        income after tax, specifically the savable income;
+                        IAT - expenses.
+        ------
+        Returns:        float. The mean income after tax during the retirement 
+                        period.
+                        
+        '''
+        results = 1e5*np.ones(individuals.shape[0])
+        self.individuals = individuals
+        for i in range(individuals.shape[0]):
+            individual = individuals[i, :]
+            self.individual = individual
+            fracs, ra_payout_frac = self.rebalance(individual)
+            self.fracs = fracs
+            scenario = self.fractionsToRands(fracs)
+            self.scenario = scenario
+            self.contr.loc[:, self.contr.columns] = scenario
+            for count, j in enumerate(self.investments.keys()):
+                self.investments[j].calculateOptimalWithdrawal(self.contr.loc[:, count],
+                                                                self.strategy,
+                                                               ra_payout_frac)
+            self.calculate()
+            self.df.loc[self.df['iat']==0, 'iat'] = -self.taxable_ibt*100
+            if self.strategy == 'optimal':
+                results[i] = round(-self.df.loc[self.retirement_date:, 'iat'].mean(), 2) #+ penalty_oversaved, 2)
+            elif self.strategy == 'safe':
+                results[i] = round(-self.df.loc[self.retirement_date:, 'iat'].mean(), 2) #+ penalty_oversaved, 2)
+        return results
 
     def calculate(self):
         
@@ -509,11 +551,14 @@ class Portfolio(object):
         plt.title('Capital')
         
         plt.figure(4)
+        plt.ylim(0, self.df['iat'].max()*1.05)
         plt.plot(index, self.df['iat'])
         plt.title('Income After Tax')
         plt.xticks(rotation=90)
+        #axes = plt.gca()
+        #axes.set_ylim([0, self.df['iat'].max()*1.05])
         
-    def fitness(self, scenario_1d, verbose = False):
+    def fitness(self, scenario_1d, verbose=False):
         
         '''
         Genetic Algorithm Fitness function. Just a wrapper casting the result of
@@ -521,8 +566,8 @@ class Portfolio(object):
         '''
         ret_tuple = self.objective(scenario_1d),
         #print('after objective')
-        #print(ret_tuple)
-        return ret_tuple
+        print(ret_tuple)
+        return 
         
     def initIndividual(self, icls, content):
         
@@ -646,13 +691,11 @@ class Portfolio(object):
                 ras_sum = ras.sum(axis=1)
                 while savable_income < 0 and ras_sum[i] > 0:
                     ras_sum = ras.sum(axis=1)
-                    #print(ras_sum[i])
                     tax = self.incomeTax(self.taxable_ibt - ras_sum[i]*self.taxable_ibt)
                     if i <= self.number_working_years:
                         savable_income = self.taxable_ibt - tax - self.uif_contr - self.expenses*12 - ras_sum[i]*self.taxable_ibt
                     else:
-                        savable_income = self.taxable_ibt - tax - self.uif_contr - self.expenses*12 - ras_sum[i]*self.taxable_ibt
-
+                        savable_income = self.taxable_ibt - tax - self.expenses*12 - ras_sum[i]*self.taxable_ibt
                     ras[i, :] -= 0.01
                 #print('savable_income', savable_income)
                 if ras[i, :] < 0:
@@ -664,11 +707,11 @@ class Portfolio(object):
             others = ind[:, len(self.ra_list):]
             others = others/others.sum(axis=1)[:, None] # normalize
             others[others==np.inf] = 0
-            others[others!=others] = 0
+            others[others!=others] = 0 #  NaNs
             ra_payout = np.clip(child[0], 0, 0.3)
             ind[:, :len(self.ra_list)] = np.abs(ras)
             ind[:, len(self.ra_list):] = np.abs(others)
-            return ind
+            return ind, ra_payout
  
     def checkBounds(self):
         
@@ -681,15 +724,88 @@ class Portfolio(object):
             def wrapper(*args, **kwargs):
                 offspring = func(*args, **kwargs)
                 for child in offspring:
-                    ind = self.rebalance(child)
-                    ra_payout = child[0]
+                    ind, ra_payout = self.rebalance(child)
                     child = creator.Individual(np.insert(ind.reshape(ind.size), 0, ra_payout)),
                 #print('ending checkbounds')
                 return offspring
             return wrapper
         return decorator
+    
+    def pso(self):
+        '''
+        Uses Particle Swarm Optimization to find optimal investment strategy.
+        '''        
+        #  Create bounds. Contributions only during working months, withdrawals only during retirement
+        min_bounds = np.zeros(1 + self.size*(self.number_working_years + self.number_retirement_years))
+        max_bounds = np.zeros(1 + self.size*(self.number_working_years + self.number_retirement_years))
+        tax = self.incomeTax(self.taxable_ibt, age=self.df.loc[self.df.index[0], 'age'])
+        savable_income = self.taxable_ibt - tax - self.uif_contr - self.expenses    
+        #  Find all columns in the dataframe containing 'capital'. This will be
+        #  used for determining max withdrawal bounds.
+        capital_cols = [i for i in df_p.columns.tolist() if 'capital' in i]
+        capital_cols.remove('capital_gains')
+        max_withdrawal = self.df.loc[self.first_retirement_date, capital_cols].max()
+        #  bounds on lump sum withdrawal:
+        min_bounds[0] = 0
+        max_bounds[0] = 0.3
+        #  bounds on contributions:
+        index = 1 #  index for persistence over multiple loops
+        for i in range(self.size): 
+            #  up to savable income during working years
+            for j in range(self.number_working_years):
+                min_bounds[index] = 0
+                max_bounds[index] = 1#savable_income
+                index += 1
+            #  No contributions during retirement
+            for j in range(self.number_retirement_years):
+                min_bounds[index] = 0
+                max_bounds[index] = 1e-5
+                index += 1           
+                
+        #  No bounds on withdrawals because we do not guess withdrawals. They are
+        #  calculated.
+        '''
+        #  bounds on withdrawals:
+        for i in range(self.size):
+            #  No withdrawals during working years:
+            for j in range(self.number_working_years):
+                min_bounds[index] = 0
+                max_bounds[index] = 1e-5
+                index += 1         
+
+    
+            #  Withdrawals during retirement years:
+            for j in range(self.number_retirement_years):
+                min_bounds[index] = 0
+                max_bounds[index] = 1
+                index += 1       
+        '''
+        bounds = (min_bounds, max_bounds)
+        self.bounds = bounds
+        
+        import pyswarms as ps
+        from pyswarms.utils.functions import single_obj as fx
+        options = {'c1': 2, #  cognitive parameter (weight of personal best)
+                   'c2': 2, #  social parameter (weight of swarm best)
+                   'v': 0, #  initial velocity
+                   'w': 0.9,#  inertia
+                   'k': 2, #  Number of neighbours. Ring topology seems popular
+                   'p': 2}  #  Distance function (Minkowski p-norm). 1 for abs, 2 for Euclidean
+
+        optimizer = ps.single.LocalBestPSO(n_particles=40,
+                                   dimensions=min_bounds.size,
+                                   options=options,
+                                   bounds=bounds)
+        
+        cost, self.best_ind = optimizer.optimize(self.pso_objective,
+                                       print_step=5,
+                                       iters=100,
+                                       verbose=10)
         
     def GA(self):
+        '''
+        Uses Genetic Algorithm to find optimal investment strategy.
+        '''
         
         creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
         creator.create("Individual", list, fitness=creator.FitnessMin)
@@ -1610,8 +1726,8 @@ class DI(Investment):
 #%% Portfolio
 
 p = Portfolio(dob='1987-02-05',
-              ibt=60000*12,
-              expenses=19000*12,
+              ibt=70000*12,
+              expenses=19000,
               monthly_med_aid_contr=2583.18,
               ma_dependents=2,
               medical_expenses=9000,
@@ -1683,7 +1799,7 @@ df_tfsa = tfsa.df
 df_p = p.df
 #p.plot()
 print('Mean IAT: R', df_p.loc[p.first_retirement_date:, 'iat'].mean())
- #%%
+#%%
 p.optimize()
 df_p = p.df
 print('Average monthly IAT during retirement:', round(p.df.loc[p.first_retirement_date:, 'iat'].mean()/12))
