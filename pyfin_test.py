@@ -13,8 +13,8 @@ import numpy as np
 #%% Portfolio
 
 p = Portfolio(dob='1987-02-05',
-              ibt=70000*12,
-              expenses=19000,
+              ibt=50000*12,
+              expenses=19000*12,
               monthly_med_aid_contr=2583.18,
               ma_dependents=2,
               medical_expenses=9000,
@@ -46,11 +46,11 @@ di = DI(initial=0,
         le=95)
 
 contr_TFSA = pd.Series(index=tfsa.df.index, name='contr',
-                       data=269649*np.ones(tfsa.df.shape[0]))
+                       data=8674/12*np.ones(tfsa.df.shape[0]))
 contr_DI = pd.Series(index=tfsa.df.index, name='contr',
-                     data=269649*np.ones(tfsa.df.shape[0]))
+                     data=218151*np.ones(tfsa.df.shape[0]))
 contr_RA = pd.Series(index=tfsa.df.index, name='contr',
-                     data=16500*np.ones(tfsa.df.shape[0]))
+                     data=0*12*np.ones(tfsa.df.shape[0]))
 withdrawals_TFSA = pd.Series(index=tfsa.df.index,
                         name='withdrawals',
                         data=0*np.ones(tfsa.df.shape[0]))
@@ -85,7 +85,7 @@ df_ra = ra.df
 df_tfsa = tfsa.df
 df_p = p.df
 #p.plot()
-print('Mean IAT: R', df_p.loc[p.first_retirement_date:, 'iat'].mean())
+print('Mean IAT: R', round(df_p.loc[p.first_retirement_date:, 'iat'].mean()/12, 2))
 #%%
 p.optimize()
 df_p = p.df

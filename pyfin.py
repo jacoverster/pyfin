@@ -116,9 +116,9 @@ class Portfolio(object):
                         'contr_TFSA',
                         'contr_total',
                         'contr_total_at',
-                        'savable_iat']] = 0
+                        'savable_iat',
+                        'iat']] = 0
         
-        self.df.loc[:, 'iat'] = 0
         self.df.loc[:, 'medical_expenses'] = medical_expenses
 
         self.df.loc[:, 'medical_expenses'] = medical_expenses
@@ -128,7 +128,7 @@ class Portfolio(object):
         self.last_working_date = self.df.loc[self.df.index<self.retirement_date].index[-1]
         self.df.loc[:self.last_working_date, 'iat'] = -self.uif_contr
 
-        #self.retirement_date = self.df.loc[self.df.index<=self.retirement_date].index[-1]
+        self.first_retirement_date = self.df.loc[self.df.index>=self.retirement_date].index[0]
         self.number_working_years = self.df.loc[self.df.index<self.last_working_date].shape[0]
         self.number_retirement_years = self.df.loc[self.df.index>=self.last_working_date].shape[0]
         self.df.loc[:self.last_working_date, 'taxable_ibt'] = self.taxable_ibt
@@ -322,19 +322,18 @@ class Portfolio(object):
         '''
         Calculates the income, taxable income, tax, etc. for the whole portfolio
         '''
-        
-        self.df.loc[:, ['taxable_ibt',
+        #  Zero all relevant columns so that the amounts don't build up over 
+        #  different function calls
+        withdrawals_colnames = ['withdrawals_' + i for i in self.investments.keys()]
+        contr_colnames = ['contr_' + i for i in self.investments.keys()]
+        zeroed_cols = ['taxable_ibt',
         'capital_gains',
-        'withdrawals_total',
-        'withdrawals_RA',
-        'withdrawals_TFSA',
-        'withdrawals_DI',
-        'contr_RA',
-        'contr_DI',
-        'contr_TFSA',
         'contr_total',
         'contr_total_at',
-        'savable_iat']] = 0
+        'savable_iat',
+        'withdrawals_total',
+        'iat'] + withdrawals_colnames + contr_colnames
+        self.df.loc[:, zeroed_cols] = 0
                         
         self.df.loc[:self.last_working_date, 'iat'] = -self.uif_contr
         self.df.loc[:self.last_working_date, 'taxable_ibt'] = self.taxable_ibt
@@ -348,12 +347,12 @@ class Portfolio(object):
             self.df['contr_total'] += self.investments[i].df['contr']
 
             #self.ra_payouts += self.investments[i].payout
-            self.df.loc[self.retirement_date, 'taxable_ibt'] += self.CGTRA(self.investments[i].payout)
+            self.df.loc[self.first_retirement_date, 'taxable_ibt'] += self.CGTRA(self.investments[i].payout)
         
         for count, i in enumerate(self.di_list):
             if count == 0:  #  Allocate RA lump sums to first DI. Can build more
                             #  intelligent functionality later.
-                self.investments[i].df.loc[self.retirement_date, 'contr'] += self.ra_payouts - self.CGTRA(self.ra_payouts)
+                self.investments[i].df.loc[self.first_retirement_date, 'contr'] += self.ra_payouts - self.CGTRA(self.ra_payouts)
                 self.investments[i].recalculateOptimalWithdrawal()
             self.df['capital_gains'] += self.investments[i].df['withdrawal_cg']
             self.df['iat'] += self.investments[i].df['withdrawals']
@@ -583,7 +582,7 @@ class Portfolio(object):
     
     def calculateTaxEfficientRAFirstIAT(self):
         self.contr = pd.DataFrame(index=self.df.index,
-                                  columns=np.arange(0, self.size))
+                                  columns=self.investment_names)
 
         solution = self.fractionsToRands(self.reshape(self.taxEfficientIndividualRAFirst()))
         self.ra_payouts = self.taxEfficientIndividualRAFirst()[0]
@@ -591,7 +590,7 @@ class Portfolio(object):
             self.contr.loc[:, key] = solution[:, count]
             self.investments[key].calculateOptimalWithdrawal(self.contr[key], self.strategy)
         self.calculate()
-        return round(self.df.loc[self.retirement_date:, 'iat'].mean()/12)
+        return round(self.df.loc[self.first_retirement_date:, 'iat'].mean()/12)
 
     def calculateTaxEfficientTFSAFirstIAT(self):
         
@@ -605,7 +604,7 @@ class Portfolio(object):
             self.contr.loc[:, key] = solution[:, count]
             self.investments[key].calculateOptimalWithdrawal(self.contr[key], self.strategy)
         self.calculate()
-        return round(self.df.loc[self.retirement_date:, 'iat'].mean()/12)
+        return round(self.df.loc[self.first_retirement_date:, 'iat'].mean()/12)
         
     
     def taxEfficientIndividualRAFirst(self):
@@ -783,7 +782,7 @@ class Portfolio(object):
         #  used for determining max withdrawal bounds.
         capital_cols = [i for i in self.df.columns.tolist() if 'capital' in i]
         capital_cols.remove('capital_gains')
-        max_withdrawal = self.df.loc[self.retirement_date, capital_cols].max()
+        max_withdrawal = self.df.loc[self.first_retirement_date, capital_cols].max()
         #  bounds on lump sum withdrawal:
         min_bounds[0] = 0
         max_bounds[0] = 0.3
@@ -806,10 +805,10 @@ class Portfolio(object):
         bounds = (min_bounds, max_bounds)
         self.bounds = bounds        
         
-        n_particles = 40
+        n_particles = 10
         dimensions = min_bounds.size
         factor_list = np.geomspace(1/20, 100, 30)
-        iterations = 50
+        iterations = 10
         tolerance = 1e-2 #  Stopping criterion: improvement per iteration
         print_interval = 1   
         w_max = 0.8
@@ -861,7 +860,8 @@ class Portfolio(object):
         improvement = 100
         previous_cost = -1
         counter = 0
-        while improvement > tolerance:
+        for i in range(iterations):
+        #while improvement > tolerance:
             counter += 1
             max_iter = max(50, counter)
             #self.myswarm.options['w'] = w_max - (w_max - w_min)*np.exp(-(counter/(max_iter/10)))
@@ -1027,11 +1027,11 @@ class TFSA(object):
 
         self.retirement_date = pd.datetime(self.dob.year + era, self.dob.month, self.dob.day)
         self.last_working_date = self.df.loc[self.df.index<=self.retirement_date].index[-1]
-        self.retirement_date = self.df.loc[self.df.index>=self.retirement_date].index[0]
+        self.first_retirement_date = self.df.loc[self.df.index>=self.retirement_date].index[0]
         
         self.retirement_date = pd.datetime(self.dob.year + era, self.dob.month, self.dob.day)
         self.last_working_date = self.df.loc[self.df.index<=self.retirement_date].index[-1]
-        self.retirement_date = self.df.loc[self.df.index>=self.retirement_date].index[0]
+        self.first_retirement_date = self.df.loc[self.df.index>=self.retirement_date].index[0]
         
         if growth == 0:
             jse = pd.read_csv('JSE_returns.csv', index_col=0)
@@ -1070,7 +1070,7 @@ class TFSA(object):
         self.df.loc[:, 'contr'] = contr                            
         self.calculate()            
         # Determine capped contributions before optimising withdrawals
-        c = self.df.loc[self.retirement_date, 'capital']
+        c = self.df.loc[self.first_retirement_date, 'capital']
         drawdown = 0.04
         if strategy == 'optimal':
             capital_at_le = 1e7
@@ -1081,14 +1081,14 @@ class TFSA(object):
                 #print(capital_at_le)
             drawdown -= 0.001
         
-        self.df.loc[self.retirement_date:, 'withdrawals'] = drawdown*c
+        self.df.loc[self.first_retirement_date:, 'withdrawals'] = drawdown*c
         
         self.df.loc[:, ['capital',
         'YTD contr',
         'Total contr',
         'withdrawals',
         'contr']] = 0
-        self.df.loc[self.retirement_date:, 'withdrawals'] = drawdown*c
+        self.df.loc[self.first_retirement_date:, 'withdrawals'] = drawdown*c
         self.df.loc[:, 'contr'] = contr  
         self.calculate()
         
@@ -1337,7 +1337,7 @@ class RA(object):
                             'contr']] = 0
         self.df.loc[self.df.index[0], 'capital'] = self.initial
         self.df.loc[self.df.index[0], 'YTD contr'] = ytd
-        self.retirement_date = self.df.loc[self.df.index>=self.retirement_date].index[0]
+        self.first_retirement_date = self.df.loc[self.df.index>=self.retirement_date].index[0]
 
     def calculateOptimalWithdrawal(self,
                                    contr,
@@ -1391,7 +1391,7 @@ class RA(object):
         previous_year = self.df.index[0]
         self.df['contr'] = contr    
         
-        for year in self.df.loc[self.df.index[0]:self.retirement_date].index[1:]:
+        for year in self.df.loc[self.df.index[0]:self.first_retirement_date].index[1:]:
             self.df.loc[year, 'capital'] = self.calculateCapitalAnnualized(self.df.loc[previous_year, 'capital'],
                                                                             self.df.loc[year, 'contr'],
                                                                             0,
@@ -1401,7 +1401,7 @@ class RA(object):
         capital_at_retirement = self.df.loc[self.last_ra_year, 'capital']
         self.payout = capital_at_retirement*payout_fraction
 
-        self.df.loc[self.retirement_date, 'capital'] = capital_at_retirement*(1 - payout_fraction)
+        self.df.loc[self.first_retirement_date, 'capital'] = capital_at_retirement*(1 - payout_fraction)
 
     def growthAfterRetirementOptimalWithdrawal(self,
                                                contr,
@@ -1420,26 +1420,25 @@ class RA(object):
         self.df['contr'] = contr    
         self.df['withdrawals'] = 0  
         
-        c = self.df.loc[self.retirement_date, 'capital']
+        c = self.df.loc[self.first_retirement_date, 'capital']
         drawdown = 0.04
         
         if strategy == 'optimal':
             capital_at_le = 1e7
             
-            arr = self.df.loc[self.df.index >= self.retirement_date, 'capital'].values
-            while capital_at_le > 0 and drawdown < 0.175:
+            arr = self.df.loc[self.df.index >= self.first_retirement_date, 'capital'].values
+            while capital_at_le > 0 and drawdown < 0.175 and 0.175*capital_at_le > drawdown*c:
                 drawdown = min(drawdown + 0.001, 0.175)
                 withdrawal = drawdown*c
                 capital_at_le = self._growthAfterRetirementQuick(arr, self.la_growth, withdrawal)
 
-        self.df.loc[self.retirement_date:, 'withdrawals'] = drawdown*c
+        self.df.loc[self.first_retirement_date:, 'withdrawals'] = drawdown*c
         self.growthAfterRetirement(contr)
-
         
     def growthAfterRetirement(self, contr):
-        previous_year = self.retirement_date
+        previous_year = self.first_retirement_date
 
-        for year in self.df.loc[self.retirement_date:].index[1:]:            
+        for year in self.df.loc[self.first_retirement_date:].index[1:]:            
             if self.df.loc[year, 'withdrawals'] <= self.df.loc[previous_year, 'capital']:
                 if self.df.loc[year, 'withdrawals'] < 0.025*self.df.loc[previous_year, 'capital']:
                     self.df.loc[year, 'withdrawals'] = 0.025*self.df.loc[previous_year, 'capital']
@@ -1517,7 +1516,7 @@ class DI(object):
         self.cg_to_date = cg_to_date
         self.monthly_growth = 10**(np.log10(1 + self.growth)/12) - 1
         self.retirement_date = pd.datetime(self.dob.year + era, self.dob.month, self.dob.day)
-        self.retirement_date = self.df.loc[self.df.index>=self.retirement_date].index[0]
+        self.first_retirement_date = self.df.loc[self.df.index>=self.retirement_date].index[0]
         self.last_working_date = self.df.loc[self.df.index<self.retirement_date].index[-1]
 
         if growth == 0:
@@ -1671,7 +1670,7 @@ class DI(object):
         expectancy is underestimated.
         '''
         self.calculate()
-        c = self.df.loc[self.retirement_date, 'capital']
+        c = self.df.loc[self.first_retirement_date, 'capital']
         drawdown = 0.04
         if strategy == 'optimal':
             capital_at_le = 1e7
@@ -1681,7 +1680,7 @@ class DI(object):
                 capital_at_le = self._calculateQuick(arr, self.growth, drawdown*c)
             drawdown -= 0.001
 
-        self.df.loc[self.retirement_date:, 'withdrawals'] = drawdown*c
+        self.df.loc[self.first_retirement_date:, 'withdrawals'] = drawdown*c
         self.calculate()
 
     def calculate(self):
