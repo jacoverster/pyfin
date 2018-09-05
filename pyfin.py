@@ -190,9 +190,8 @@ class Portfolio(object):
         
         time1 = time.time()
         #import scipy.optimize as spm
-        
-        print('Mean post-retirement IAT, tax efficient plan, TFSA priority:', self.calculateTaxEfficientTFSAFirstIAT())
-        print('Mean post-retirement IAT tax efficient plan, RA priority:', self.calculateTaxEfficientRAFirstIAT())
+        tfsa_priority_plan = self.calculateTaxEfficientTFSAFirstIAT()
+        ra_priority_plan = self.calculateTaxEfficientRAFirstIAT()
 
           
         self.contr = pd.DataFrame(index=self.df.index,
@@ -217,7 +216,23 @@ class Portfolio(object):
         self.calculate()
         print('Duration:', (time.time() - time1)/60, 'min')
         self.plot()
-               
+        
+        pso_plan = round(self.df.loc[self.first_retirement_date:, 'iat'].mean()/12, 2)       
+        
+        if pso_plan > ra_priority_plan and pso_plan > tfsa_priority_plan:
+            print('The PSO plan is the best, with a mean post-retirement IAT of R', pso_plan)
+            print('RA:', ra_priority_plan, 'Percentage improvement:', round(100*(pso_plan/ra_priority_plan - 1), 2))
+            print('TFSA:', tfsa_priority_plan, 'Percentage improvement:', round(100*(pso_plan/tfsa_priority_plan - 1), 2))
+
+        elif ra_priority_plan > pso_plan and ra_priority_plan > tfsa_priority_plan:
+            print('The RA priority plan is the best, with a mean post-retirement IAT of R', ra_priority_plan)
+            print('PSO:', pso_plan)
+            print('TFSA:', tfsa_priority_plan)
+        else:
+            print('The TFSA priority plan is the best, with a mean post-retirement IAT of R', tfsa_priority_plan)
+            print('PSO:', pso_plan)
+            print('RA:', tfsa_priority_plan)
+
     #@numba.jit
     def reshape(self, ind):
         arr_ind = np.array(ind[1:])
@@ -805,14 +820,14 @@ class Portfolio(object):
         bounds = (min_bounds, max_bounds)
         self.bounds = bounds        
         
-        n_particles = 10
+        n_particles = int(max(20, len(self.investment_names)*self.number_working_years/4))
+        if n_particles%2 != 0:
+            n_particles += 1
         dimensions = min_bounds.size
         factor_list = np.geomspace(1/20, 100, 30)
         iterations = 10
         tolerance = 1e-2 #  Stopping criterion: improvement per iteration
         print_interval = 1   
-        w_max = 0.8
-        w_min = 0.05
         options = {'c1': 2, #  cognitive parameter (weight of personal best)
                    'c2': 2, #  social parameter (weight of swarm best)
                    'v': 0, #  initial velocity
@@ -857,11 +872,11 @@ class Portfolio(object):
                      #clamp=(-0.2, 0.2)
                      )
         
-        improvement = 100
+        improvement = [100, 100]
         previous_cost = -1
         counter = 0
-        for i in range(iterations):
-        #while improvement > tolerance:
+        #for i in range(iterations):
+        while sum(improvement) > tolerance:
             counter += 1
             max_iter = max(50, counter)
             #self.myswarm.options['w'] = w_max - (w_max - w_min)*np.exp(-(counter/(max_iter/10)))
@@ -881,14 +896,14 @@ class Portfolio(object):
             self.myswarm.best_pos, self.myswarm.best_cost = topology.compute_gbest(self.myswarm,
 #                options['p'], options['k']
             )
-        
+            improvement[1] = improvement[0]
+            improvement[0] = self.myswarm.best_cost/previous_cost - 1        
             if i%print_interval==0:
-                print('Iteration: {} | best cost: {:.0f} | Improvement: {:2f}'.format(counter, self.myswarm.best_cost, improvement))
+                print('Iteration: {} | best cost: {:.0f} | Improvement: {:2f}'.format(counter, self.myswarm.best_cost, improvement[0]))
             self.myswarm.velocity = topology.compute_velocity(self.myswarm)
             self.myswarm.position = topology.compute_position(self.myswarm)
             self.myswarm = self.rebalancePSO(self.myswarm)
             
-            improvement = self.myswarm.best_cost/previous_cost - 1
             previous_cost = self.myswarm.best_cost
         print('The best cost: {:.4f}'.format(self.myswarm.best_cost))
         print('The best position found by our swarm is: {}'.format(self.myswarm.best_pos))           
@@ -1427,7 +1442,7 @@ class RA(object):
             capital_at_le = 1e7
             
             arr = self.df.loc[self.df.index >= self.first_retirement_date, 'capital'].values
-            while capital_at_le > 0 and drawdown < 0.175 and 0.175*capital_at_le > drawdown*c:
+            while capital_at_le > 0 and drawdown < 0.175 and capital_at_le > drawdown*c:
                 drawdown = min(drawdown + 0.001, 0.175)
                 withdrawal = drawdown*c
                 capital_at_le = self._growthAfterRetirementQuick(arr, self.la_growth, withdrawal)

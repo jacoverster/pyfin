@@ -48,9 +48,9 @@ di = DI(initial=0,
 contr_TFSA = pd.Series(index=tfsa.df.index, name='contr',
                        data=8674/12*np.ones(tfsa.df.shape[0]))
 contr_DI = pd.Series(index=tfsa.df.index, name='contr',
-                     data=218151*np.ones(tfsa.df.shape[0]))
+                     data=9000*np.ones(tfsa.df.shape[0]))
 contr_RA = pd.Series(index=tfsa.df.index, name='contr',
-                     data=0*12*np.ones(tfsa.df.shape[0]))
+                     data=13750*12*np.ones(tfsa.df.shape[0]))
 withdrawals_TFSA = pd.Series(index=tfsa.df.index,
                         name='withdrawals',
                         data=0*np.ones(tfsa.df.shape[0]))
@@ -85,7 +85,7 @@ df_ra = ra.df
 df_tfsa = tfsa.df
 df_p = p.df
 #p.plot()
-print('Mean IAT: R', round(df_p.loc[p.first_retirement_date:, 'iat'].mean()/12, 2))
+print('Mean IAT, current contributions: R', round(df_p.loc[p.first_retirement_date:, 'iat'].mean()/12, 2))
 #%%
 p.optimize()
 df_p = p.df
