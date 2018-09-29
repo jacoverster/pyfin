@@ -6,51 +6,49 @@ Created on Wed Aug 22 12:57:23 2018
 @author: herman
 """
 
-from pyfin import Portfolio, TFSA, DI, RA
+from pyfin import Portfolio, Person, TFSA, DI, RA
 import pandas as pd
 import numpy as np
 
 #%% Portfolio
-
-p = Portfolio(dob='1987-02-05',
-              ibt=50000*12,
-              expenses=19000*12,
+herman = Person(dob='1987-02-05',
+              ibt=50000,
+              expenses=19000,
               monthly_med_aid_contr=2583.18,
-              ma_dependents=2,
+              ma_dependants=2,
               medical_expenses=9000,
               era=65,
               le=95,
               strategy='optimal')
 
-tfsa = TFSA(initial=0,
+p = Portfolio(herman)
+df_p = p.df
+
+
+tfsa = TFSA(herman, 
+            initial=0,
             growth=15,
-            ytd=0,
             ctd=0,
-            dob='1987-02-05',
-            era=65,
-            le=95)
+            ytd=33000)
 
-ra = RA(initial=50000,
-        ra_growth=12,
-        la_growth=10,
+ra = RA(herman,
+        initial=50000,
+        ra_growth=15,
+        la_growth=15,
         ytd=2500,
-        dob='1987-02-05',
-        le=95,
-        era=65,
-        payout_fraction=0)
+        payout_fraction=0.3)
 
-di = DI(initial=0,
+di = DI(herman,
+        initial=0,
         growth=15,
-        dob='1987-02-05',
-        era=65,
-        le=95)
+        cg_to_date=0)
 
 contr_TFSA = pd.Series(index=tfsa.df.index, name='contr',
                        data=8674/12*np.ones(tfsa.df.shape[0]))
 contr_DI = pd.Series(index=tfsa.df.index, name='contr',
-                     data=9000*np.ones(tfsa.df.shape[0]))
+                     data=9000*np.ones(di.df.shape[0]))
 contr_RA = pd.Series(index=tfsa.df.index, name='contr',
-                     data=13750*12*np.ones(tfsa.df.shape[0]))
+                     data=13750*12*np.ones(ra.df.shape[0]))
 withdrawals_TFSA = pd.Series(index=tfsa.df.index,
                         name='withdrawals',
                         data=0*np.ones(tfsa.df.shape[0]))
@@ -62,12 +60,11 @@ withdrawals_RA = pd.Series(index=tfsa.df.index,
                         data=7000*np.ones(tfsa.df.shape[0]))
 
 contr_TFSA.iloc[16:] = 0
+contr_DI.loc[p.first_fy_after_retirement:] = 0
+contr_RA.loc[p.first_fy_after_retirement:] = 0
 
-contr_DI.loc[p.retirement_date:] = 0
-contr_RA.loc[p.retirement_date:] = 0
-
-withdrawals_DI.loc[p.df.index[0]:p.retirement_date] = 0
-withdrawals_RA.loc[p.df.index[0]:p.retirement_date] = 0
+withdrawals_DI.loc[p.df.index[0]:p.retirement_fy_end] = 0
+withdrawals_RA.loc[p.df.index[0]:p.last_working_year] = 0
 withdrawals_TFSA.loc[p.df.index[0]:] = 0
 
 
@@ -84,17 +81,20 @@ df_di = di.df
 df_ra = ra.df
 df_tfsa = tfsa.df
 df_p = p.df
-#p.plot()
-print('Mean IAT, current contributions: R', round(df_p.loc[p.first_retirement_date:, 'iat'].mean()/12, 2))
+p.plot()
+print('Mean IAT, current contributions: R', round(df_p.loc[p.retirement_fy_end:, 'iat'].mean()/12, 2))
+
+
 #%%
 p.optimize()
 df_p = p.df
-print('Average monthly IAT during retirement:', round(p.df.loc[p.first_retirement_date:, 'iat'].mean()/12))
+print('Average monthly IAT during retirement:', round(p.df.loc[p.retirement_fy_end:, 'iat'].mean()/12))
 
+#%%
 '''
 for count, i in enumerate(self.investments.keys()):
     self.contr.loc[:self.last_working_date, count] = self.savable_income/self.size
-    self.withdrawals.loc[self.first_retirement_date:, count] = self.taxable_ibt/self.size/3
+    self.withdrawals.loc[self.retirement_fy_end:, count] = self.taxable_ibt/self.size/3
 
 
 scenario = np.concatenate((self.contr.values, self.withdrawals.values), axis=1)

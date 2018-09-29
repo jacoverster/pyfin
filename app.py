@@ -46,6 +46,14 @@ app.layout = html.Div(children=[
         The output of the tool is a report with a possible allocation plan for\
         the rest of this tax year. It also provides the projections into the\
         future.
+        
+        NOTE:
+        - This is the Alpha version, made available for feedback. So it isn't\
+        pretty, and it isn't necessarily trustworthy yet.
+        - If you see any problems, or there are features you think would\
+        enhance PyFin for most users, please send as an email.
+        - You can read the White Paper about how PyFin works here:\
+        https://gitlab.com/invokeanalytics/pyfin/blob/master/PyFin%20White%20Paper/Pyfin%20White%20Paper.pdf
     ''',
             style={'font-family':'Open Sans'}),
     html.Div(id='basic_portfolio_info', className='form', children=[             

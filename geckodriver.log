@@ -1,0 +1,38 @@
+1536898372455	geckodriver	INFO	geckodriver 0.21.0
+1536898372488	geckodriver	INFO	Listening on 127.0.0.1:39454
+1536898373478	mozrunner::runner	INFO	Running command: "/usr/bin/firefox" "-marionette" "-foreground" "-no-remote" "-profile" "/tmp/rust_mozprofile.v3ulpJicXn3G"
+1536898377095	Marionette	INFO	Listening on port 39575
+1536898377232	Marionette	WARN	TLS certificate errors will be ignored for this session
+1536898377309	Marionette	DEBUG	[2147483649] Frame script loaded
+1536898377311	Marionette	DEBUG	[2147483649] Frame script registered
+1536898377333	Marionette	DEBUG	[2147483649] Received DOM event beforeunload for about:blank
+1536898377463	Marionette	DEBUG	[2147483649] Received DOM event pagehide for about:blank
+1536898377848	Marionette	DEBUG	[2147483649] Received DOM event DOMContentLoaded for http://196.38.158.102/AEON/(X(1)S(lj1pa43gpkpla3a4poytscjv))/Login.aspx?AspxAutoDetectCookieSupport=1
+1536898379246	Marionette	DEBUG	[2147483649] Received DOM event pageshow for http://196.38.158.102/AEON/(X(1)S(lj1pa43gpkpla3a4poytscjv))/Login.aspx?AspxAutoDetectCookieSupport=1
+1536898389411	Marionette	DEBUG	[2147483649] Received DOM event beforeunload for http://196.38.158.102/AEON/(X(1)S(lj1pa43gpkpla3a4poytscjv))/Navigate_Cust.aspx
+1536898389497	Marionette	DEBUG	[2147483649] Received DOM event pagehide for http://196.38.158.102/AEON/(X(1)S(lj1pa43gpkpla3a4poytscjv))/Navigate_Cust.aspx
+1536898389498	Marionette	DEBUG	[2147483649] Received DOM event unload for http://196.38.158.102/AEON/(X(1)S(lj1pa43gpkpla3a4poytscjv))/Navigate_Cust.aspx
+1536898389519	Marionette	DEBUG	[2147483649] Received DOM event DOMContentLoaded for http://196.38.158.102/AEON/(X(1)S(lj1pa43gpkpla3a4poytscjv))/Navigate_Cust.aspx
+1536898389535	Marionette	DEBUG	[2147483649] Received DOM event pageshow for http://196.38.158.102/AEON/(X(1)S(lj1pa43gpkpla3a4poytscjv))/Navigate_Cust.aspx
+1536898396930	Marionette	DEBUG	[2147483649] Canceled page load listener because no navigation has been detected
+console.warn: LoginRecipes: getRecipes: falling back to a synchronous message for: http://196.38.158.102
+console.warn: LoginRecipes: getRecipes: falling back to a synchronous message for: http://196.38.158.102
+1536898643279	Marionette	DEBUG	[2147483649] Received DOM event beforeunload for http://196.38.158.102/AEON/(X(1)S(lj1pa43gpkpla3a4poytscjv))/Navigate_Cust.aspx
+1536898643480	Marionette	DEBUG	[2147483649] Received DOM event pagehide for http://196.38.158.102/AEON/(X(1)S(lj1pa43gpkpla3a4poytscjv))/Navigate_Cust.aspx
+1536898643483	Marionette	DEBUG	[2147483649] Received DOM event unload for http://196.38.158.102/AEON/(X(1)S(lj1pa43gpkpla3a4poytscjv))/Navigate_Cust.aspx
+1536898643548	Marionette	DEBUG	[2147483649] Received DOM event beforeunload for http://196.38.158.102/AEON/(X(1)S(lj1pa43gpkpla3a4poytscjv))/Login.htm
+1536898643551	Marionette	DEBUG	[2147483649] Received DOM event pageshow for http://196.38.158.102/AEON/(X(1)S(lj1pa43gpkpla3a4poytscjv))/Login.htm
+1536898643590	Marionette	DEBUG	[2147483649] Received DOM event DOMContentLoaded for http://196.38.158.102/AEON/(X(1)S(lj1pa43gpkpla3a4poytscjv))/Login.htm
+1536898643732	Marionette	DEBUG	[2147483649] Received DOM event unload for http://196.38.158.102/AEON/(X(1)S(lj1pa43gpkpla3a4poytscjv))/Login.htm
+1536898643943	Marionette	DEBUG	[2147483649] Received observer notification outer-window-destroyed for 2147483657
+1536898643944	Marionette	DEBUG	[2147483649] Received observer notification outer-window-destroyed for 2147483658
+1536898645975	Marionette	INFO	Stopped listening on port 39575
+IPDL protocol error: Handler returned error code!
+
+###!!! [Parent][DispatchAsyncMessage] Error: PLayerTransaction::Msg_ReleaseLayer Processing error: message was deserialized, but the handler returned false (indicating failure)
+
+1536898646256	addons.xpi	ERROR	Failed to download system add-on fxmonitor@mozilla.org: Error: Data is not ready. (resource://gre/modules/JSONFile.jsm:159:13) JS Stack trace: get data@JSONFile.jsm:159:13
+_get@ExtensionPermissions.jsm:63:9
+observe@AsyncShutdown.jsm:541:9
+1536898646257	addons.manager	WARN	Failed to update system addons: Error: Rejecting updated system add-on set that either could not be downloaded or contained unusable add-ons. (resource://gre/modules/addons/XPIInstall.jsm:3645:13) JS Stack trace: updateSystemAddons@XPIInstall.jsm:3645:13
+observe@AsyncShutdown.jsm:541:9
