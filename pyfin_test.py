@@ -81,15 +81,14 @@ df_di = di.df
 df_ra = ra.df
 df_tfsa = tfsa.df
 df_p = p.df
-p.plot()
+#p.plot()
 print('Mean IAT, current contributions: R', round(df_p.loc[p.retirement_fy_end:, 'iat'].mean()/12, 2))
 
 
 #%%
-p.optimize()
+p.optimize(reduced_expenses=True)
 df_p = p.df
 print('Average monthly IAT during retirement:', round(p.df.loc[p.retirement_fy_end:, 'iat'].mean()/12))
-
 #%%
 '''
 for count, i in enumerate(self.investments.keys()):

@@ -331,72 +331,98 @@ class Portfolio(TaxableEntity):
         self.df.loc[:, 'monthly_med_aid_contr'] = df_input['Monthly medical aid contribution']*12
         self.df.loc[:, 'ma_dependants'] = df_input['Medical Aid dependants']
                 
-    def optimize(self):
+    def optimize(self, reduced_expenses=False):
         
         '''
         Optimizes the investment allocations of the portfolio over time by using
         a Particle Swarm Optimization algorithm.
+        
+        This function contains two subfunctions: solutions, and determineOptimalSolution.
+        This was done to decrease code repetition.
         '''
         
-        time1 = time.time()
-        #import scipy.optimize as spm
-        tfsa_priority_plan = self.calculateTaxEfficientTFSAFirstIAT()
-        ra_priority_plan = self.calculateTaxEfficientRAFirstIAT()
-
-          
-        self.contr = pd.DataFrame(index=self.df.index,
-                                     columns=self.investment_names)
-
-            
-        best_ind, cost = self.pso()
-        print('Duration:', (time.time() - time1)/60, 'min')
-        self.best_ind = best_ind
-        solution, ra_payouts = self.fractionsToRands(self.reshape(best_ind)) 
-        self.solution = solution
-        for count, key in enumerate(self.investment_names):
-            self.contr.loc[:, key] = solution[:, count]
-            self.investments[key].calculateOptimalWithdrawal(self.contr[key], self.strategy)
-            
-        self.calculate()
+        def solutions():
         
-        pso_plan = round(self.df.loc[self.retirement_fy_end:, 'iat'].mean()/12, 2)       
-        
-        if pso_plan > ra_priority_plan and pso_plan > tfsa_priority_plan:
-            print('The PSO plan is the best, with a mean post-retirement IAT of R', pso_plan)
-            print('RA:', ra_priority_plan, 'Percentage improvement:', round(100*(pso_plan/ra_priority_plan - 1), 2))
-            print('TFSA:', tfsa_priority_plan, 'Percentage improvement:', round(100*(pso_plan/tfsa_priority_plan - 1), 2))
-            self.plot()
-        elif int(tfsa_priority_plan) == (tfsa_priority_plan):
-            print('The TFSA and RA priority plans are equal, with a mean post-retirement IAT of R', tfsa_priority_plan)
-            solution, ra_payouts = self.fractionsToRands(self.reshape(self.taxEfficientPosTFSAFirst())) 
+            time1 = time.time()
+            #import scipy.optimize as spm
+            tfsa_priority_plan = self.calculateTaxEfficientTFSAFirstIAT()
+            ra_priority_plan = self.calculateTaxEfficientRAFirstIAT()
+    
+              
+            self.contr = pd.DataFrame(index=self.df.index,
+                                         columns=self.investment_names)
+    
+                
+            best_ind, cost = self.pso()
+            print('Duration:', (time.time() - time1)/60, 'min')
+            self.best_ind = best_ind
+            solution, ra_payouts = self.fractionsToRands(self.reshape(best_ind)) 
             self.solution = solution
             for count, key in enumerate(self.investment_names):
                 self.contr.loc[:, key] = solution[:, count]
                 self.investments[key].calculateOptimalWithdrawal(self.contr[key], self.strategy)
+                
             self.calculate()
-            self.plot()
-        elif ra_priority_plan > pso_plan and ra_priority_plan > tfsa_priority_plan:
-            print('The RA priority plan is the best, with a mean post-retirement IAT of R', ra_priority_plan)
-            print('PSO:', pso_plan)
-            print('TFSA:', tfsa_priority_plan)            
-            solution, ra_payouts = self.fractionsToRands(self.reshape(self.taxEfficientPositionRAFirst())) 
-            self.solution = solution
-            for count, key in enumerate(self.investment_names):
-                self.contr.loc[:, key] = solution[:, count]
-                self.investments[key].calculateOptimalWithdrawal(self.contr[key], self.strategy)
-            self.calculate()
-            self.plot()            
-        elif tfsa_priority_plan > pso_plan and tfsa_priority_plan > ra_priority_plan:
-            print('The TFSA priority plan is the best, with a mean post-retirement IAT of R', tfsa_priority_plan)
-            print('PSO:', pso_plan)
-            print('RA:', tfsa_priority_plan)
-            solution, ra_payouts = self.fractionsToRands(self.reshape(self.taxEfficientPosTFSAFirst())) 
-            self.solution = solution
-            for count, key in enumerate(self.investment_names):
-                self.contr.loc[:, key] = solution[:, count]
-                self.investments[key].calculateOptimalWithdrawal(self.contr[key], self.strategy)
-            self.calculate()
-            self.plot()            
+            pso_plan = round(self.df.loc[self.retirement_fy_end:, 'iat'].mean()/12, 2)       
+            return pso_plan, tfsa_priority_plan, ra_priority_plan            
+
+        def determineOptimalPlan(plan_tup):
+            pso_plan, tfsa_priority_plan, ra_priority_plan = plan_tup[0], plan_tup[1], plan_tup[2]
+            if pso_plan > ra_priority_plan and pso_plan > tfsa_priority_plan:
+                best_plan = pso_plan
+                print('The PSO plan is the best, with a mean post-retirement IAT of R', pso_plan)
+                print('RA:', ra_priority_plan, 'Percentage improvement:', round(100*(pso_plan/ra_priority_plan - 1), 2))
+                print('TFSA:', tfsa_priority_plan, 'Percentage improvement:', round(100*(pso_plan/tfsa_priority_plan - 1), 2))
+                self.plot()
+            elif int(tfsa_priority_plan) == (tfsa_priority_plan):
+                best_plan = tfsa_priority_plan
+                print('The TFSA and RA priority plans are equal, with a mean post-retirement IAT of R', tfsa_priority_plan)
+                solution, ra_payouts = self.fractionsToRands(self.reshape(self.taxEfficientPosTFSAFirst())) 
+                self.solution = solution
+                for count, key in enumerate(self.investment_names):
+                    self.contr.loc[:, key] = solution[:, count]
+                    self.investments[key].calculateOptimalWithdrawal(self.contr[key], self.strategy)
+                self.calculate()
+                self.plot()
+            elif ra_priority_plan > pso_plan and ra_priority_plan > tfsa_priority_plan:
+                best_plan = ra_priority_plan
+                print('The RA priority plan is the best, with a mean post-retirement IAT of R', ra_priority_plan)
+                print('PSO:', pso_plan)
+                print('TFSA:', tfsa_priority_plan)            
+                solution, ra_payouts = self.fractionsToRands(self.reshape(self.taxEfficientPositionRAFirst())) 
+                self.solution = solution
+                for count, key in enumerate(self.investment_names):
+                    self.contr.loc[:, key] = solution[:, count]
+                    self.investments[key].calculateOptimalWithdrawal(self.contr[key], self.strategy)
+                self.calculate()
+                self.plot()            
+            elif tfsa_priority_plan > pso_plan and tfsa_priority_plan > ra_priority_plan:
+                best_plan = tfsa_priority_plan
+                print('The TFSA priority plan is the best, with a mean post-retirement IAT of R', tfsa_priority_plan)
+                print('PSO:', pso_plan)
+                print('RA:', tfsa_priority_plan)
+                solution, ra_payouts = self.fractionsToRands(self.reshape(self.taxEfficientPosTFSAFirst())) 
+                self.solution = solution
+                for count, key in enumerate(self.investment_names):
+                    self.contr.loc[:, key] = solution[:, count]
+                    self.investments[key].calculateOptimalWithdrawal(self.contr[key], self.strategy)
+                self.calculate()
+                self.plot()  
+            return best_plan
+            
+        expenses = 0
+        if reduced_expenses:
+            best_plan = determineOptimalPlan(solutions())            
+            #  Now calculate with reduced expenses
+            expenses = self.df.expenses
+            self.df.loc[:, 'expenses'] = self.df.loc[:, 'expenses']*0.9
+            # Recalculate at reduced expenses:
+            best_plan_reduced = determineOptimalPlan(solutions())
+            self.df.loc[:, 'expenses'] = expenses
+            print(f'''If you reduce your expenses by 10%, you can increase your\
+                  post-retirement income after tax by  {round((best_plan_reduced/best_plan - 1), 2)*100}%''')
+        else:
+            best_plan = determineOptimalPlan(solutions())
 
     #@numba.jit
     def reshape(self, pos):
@@ -418,9 +444,15 @@ class Portfolio(TaxableEntity):
         Returns:
         ndarray of shape n_working_years x n_investments, in Fortran indexing.
         '''
-        arr_pos = np.array(pos[len(self.ra_list):]) # disregard RA lump sum withdrawal figures.
-        return arr_pos.reshape(int(arr_pos.size/(self.size)), self.size, order='F'), pos[:len(self.ra_list)]
-    
+        if len(self.ra_list):
+            arr_pos = np.array(pos[len(self.ra_list):]) # disregard RA lump sum withdrawal figures.
+        else:
+            arr_pos = np.array(pos[1:])
+        if len(self.ra_list):
+            return arr_pos.reshape(int(arr_pos.size/self.size), self.size, order='F'), pos[:len(self.ra_list)]
+        else:
+            return arr_pos.reshape(int(arr_pos.size/self.size), self.size, order='F'), None
+
     def NPV(self, amount, date):
         '''
         Nett present value conversion from future date to present value.
@@ -454,16 +486,20 @@ class Portfolio(TaxableEntity):
         converts fractions saved into Rands saved. It does so for all years at once.
         ------
         Parameters:     
-        ind:                ndarray. Numpy array of size [self.number_working_years + number_retirement_years, self.size]
-        ra_payout_frac:     list. List of payout fractions for all RAs
+        tup:                tuple. Tuple containing ind as the first element
+                            and ra_payout_frac as the second.
+                            ind: ndarray. Numpy array of size [self.number_working_years + number_retirement_years, self.size]
+                            ra_payout_frac: list. List of payout fractions for all RAs
         ------
         Returns:        ndarray. Same shape as input. Just with Rand values.
         '''
         ind = tup[0]
         ra_payout_frac = tup[1]
         contr = np.zeros_like(ind) #  exclude RA payout fraction (first item in arr)
-
-        ra_contr = self.df.taxable_ibt*ind[:, :len(self.ra_list)].sum(axis=1)
+        if len(self.ra_list):
+            ra_contr = self.df.taxable_ibt*ind[:, :len(self.ra_list)].sum(axis=1)
+        else:
+            ra_contr = np.array(np.zeros(self.df.shape[0]))
         tax = np.zeros(len(contr))
         for i, year in enumerate(self.df.index):
             taxSeries = pd.Series({'taxable_ibt': self.df.loc[year,'taxable_ibt'],
@@ -477,28 +513,24 @@ class Portfolio(TaxableEntity):
                 print('Tax:', tax[i], '\n')
                       
         savable_income = np.maximum(0, self.df.taxable_ibt - ra_contr - tax - self.uif_contr - self.df.expenses)
-        #print('f2R Savable income', savable_income)
-        #print('f2R expenses', self.df.expenses)
-        #print('f2R ra contr', ra_contr)
-        #print('f2R tax', tax)
         if verbose:
             print('Tax:\n', tax)
             print('savable income:\n', savable_income)
         #savable_income[self.number_working_years:] = np.maximum(0, savable_income[self.number_working_years] - self.uif_contr)
         mask = np.ones_like(savable_income)
         mask[savable_income <= 0] = 0
-
         self.ind = ind
         self.mask = mask
         contr[:, :len(self.ra_list)] = mask.reshape(-1,1)*self.df.loc[:, 'taxable_ibt'].values.reshape(-1,1)*ind[:, :len(self.ra_list)]
         contr[:, len(self.ra_list):] = savable_income[:, None]*np.array(ind[:, len(self.ra_list):])
-
-        if len(self.ra_list) == len(ra_payout_frac):
+        if len(self.ra_list) == 0 and ra_payout_frac is None:
+            return contr, 0       
+        elif len(self.ra_list) == len(ra_payout_frac):
             ra_payout = [0]*len(self.ra_list)
+            
             for i, ra_name in enumerate(self.ra_list):
                 self.investments[ra_name].growthBeforeRetirement(contr[:, i], ra_payout_frac[i])
                 ra_payout[i] = self.investments[ra_name].df.loc[self.last_working_year, 'capital']*self.ra_payout_fracs[i]
-            
             return contr, ra_payout
         else:
             raise AttributeError('RA list length {} does not match payout_frac length {}'.format(len(self.ra_list), len(ra_payout_frac)))
@@ -534,12 +566,12 @@ class Portfolio(TaxableEntity):
                         period for specific position.                    
         
         '''
+        
         fracs, ra_payout_frac = self.reshape(pos)
         scenario, ra_payouts = self.fractionsToRands((fracs, ra_payout_frac))
         self.contr.loc[:, self.contr.columns] = scenario
         for count, name in enumerate(self.investments.keys()):
             self.investments[name].calculateOptimalWithdrawal(self.contr.loc[:, name],
-                                                            self.strategy,
                                                            ra_payout_frac)
         self.calculate()
         self.df.loc[self.df['iat']==0, 'iat'] = -self.taxable_ibt*100
@@ -548,6 +580,7 @@ class Portfolio(TaxableEntity):
             result = round(-self.df.loc[self.retirement_date:, 'iat'].mean(), 2) #+ penalty_oversaved, 2)
         elif self.strategy == 'safe':
             result = round(-self.df.loc[self.retirement_date:, 'iat'].mean(), 2) #+ penalty_oversaved, 2)
+            
         return result
         
 
@@ -559,6 +592,13 @@ class Portfolio(TaxableEntity):
         '''
         #  Zero all relevant columns so that the amounts don't build up over 
         #  different function calls
+        
+        if len(self.di_list) == 0:
+            self.addInvestment('DI', DI(self.person,
+                                        0,
+                                        12,
+                                        0))
+        
         withdrawals_colnames = ['withdrawals_' + i for i in self.investments.keys()]
         contr_colnames = ['contr_' + i for i in self.investments.keys()]
         zeroed_cols = ['taxable_ibt',
@@ -592,7 +632,7 @@ class Portfolio(TaxableEntity):
         self.ra_payouts = ra_payouts
         
         self.investments[self.max_di_name].ra_lump_sum = ra_payouts
-        self.investments[self.max_di_name].recalculateOptimalWithdrawal(self.strategy)
+        self.investments[self.max_di_name].recalculateOptimalWithdrawal()
         
         for count, i in enumerate(self.di_list):
             self.df['capital_gains'] += self.investments[i].df['withdrawal_cg']
@@ -801,8 +841,10 @@ class Portfolio(TaxableEntity):
         
         plt.figure(1)
         index = [x.strftime('%Y-%M-%d') for x in self.df.index.date]
-        plt.plot(index, self.df['withdrawals_TFSA'], label='TFSA')
-        plt.plot(index, self.df['withdrawals_RA'], label='RA')
+        if len(self.tfsa_list):
+            plt.plot(index, self.df['withdrawals_TFSA'], label='TFSA')
+        if len(self.ra_list):
+            plt.plot(index, self.df['withdrawals_RA'], label='RA')
         plt.plot(index, self.df['withdrawals_DI'], label='DI')
         plt.title('Withdrawals')
         plt.xlabel('Dates')
@@ -811,8 +853,10 @@ class Portfolio(TaxableEntity):
         plt.legend()
         
         plt.figure(2)
-        plt.plot(index, self.df['contr_TFSA'], label='TFSA')
-        plt.plot(index, self.df['contr_RA'], label='RA')
+        if len(self.tfsa_list):
+            plt.plot(index, self.df['contr_TFSA'], label='TFSA')
+        if len(self.ra_list):
+            plt.plot(index, self.df['contr_RA'], label='RA')
         plt.plot(index, self.df['contr_DI'], label='DI')
         plt.xlabel('Dates')
         plt.ylabel('Amount [R]')
@@ -821,8 +865,10 @@ class Portfolio(TaxableEntity):
         plt.title('Contributions')
         
         plt.figure(3)
-        plt.plot(index, self.df['capital_TFSA'], label='TFSA')
-        plt.plot(index, self.df['capital_RA'], label='RA')
+        if len(self.tfsa_list):
+            plt.plot(index, self.df['capital_TFSA'], label='TFSA')
+        if len(self.ra_list):
+            plt.plot(index, self.df['capital_RA'], label='RA')
         plt.plot(index, self.df['capital_DI'], label='DI')
         plt.xlabel('Dates')
         plt.ylabel('Amount [R]')
@@ -971,23 +1017,25 @@ class Portfolio(TaxableEntity):
                 elif len(self.ra_list) > 1: #  Else allocate to max growth RA
                     contr[i, self.investment_names.index[self.max_ra_name]] = ra_frac[i]
                     
-            # Calculate TFSA
-            if savable_income >= self.TFSA_ANN_LIMIT:
-                tfsa_frac = self.TFSA_ANN_LIMIT/savable_income #  TFSA as % of savable income
-            else:
-                tfsa_frac = 1       # 100% of savable income   
-            contr[i, self.investment_names.index(self.max_tfsa_name)] = tfsa_frac
-    
-            #  Calculate and allocate DI
-            if tfsa_frac < 1:
-                contr[i, self.investment_names.index(self.max_di_name)] = 1 - tfsa_frac
+                # Calculate TFSA
+                if len(self.tfsa_list):
+                    if savable_income >= self.TFSA_ANN_LIMIT:
+                        tfsa_frac = self.TFSA_ANN_LIMIT/savable_income #  TFSA as % of savable income
+                    else:
+                        tfsa_frac = 1       # 100% of savable income   
+                    contr[i, self.investment_names.index(self.max_tfsa_name)] = tfsa_frac
+        
+                #  Calculate and allocate DI
+                if tfsa_frac < 1:
+                    contr[i, self.investment_names.index(self.max_di_name)] = 1 - tfsa_frac
             
         #contr_full = np.array([contr[0, :] if i < self.number_working_years else np.zeros(self.size) for i in range(len(contr))])
-        
-        self.investments[self.ra_list[0]].growthBeforeRetirement(contr)
-        ra_retirement_capital = self.investments[self.ra_list[0]].df.loc[self.last_working_year, 'capital'].copy()
-        ra_payout = min(self.CGTRA_LIM1/ra_retirement_capital, ra_retirement_capital*0.3/ra_retirement_capital)
-
+        if len(self.ra_list):
+            self.investments[self.ra_list[0]].growthBeforeRetirement(contr) 
+            ra_retirement_capital = self.investments[self.ra_list[0]].df.loc[self.last_working_year, 'capital'].copy()
+            ra_payout = min(self.CGTRA_LIM1/ra_retirement_capital, ra_retirement_capital*0.3/ra_retirement_capital)
+        else:
+            ra_payout = np.array([0])
         return np.insert(contr.reshape(contr.size, order='F'), 0, ra_payout)
 
     def taxEfficientPosTFSAFirst(self):
@@ -1008,7 +1056,7 @@ class Portfolio(TaxableEntity):
         ra_limit = np.minimum(self.RA_MAX_PERC*self.df.taxable_ibt, self.RA_ANN_LIMIT)
         for i in range(self.number_working_years):
             #  Allocate TFSA first:
-            if len(self.tfsa_list) > 0:
+            if len(self.tfsa_list) > 0 and tfsa_contr[0:i].sum() < self.TFSA_TOTAL_LIMIT:
                 savable_income_after_tfsa = 1
                 savable_income = 1
                 #print('tfsa contr', tfsa_contr[i])
@@ -1048,9 +1096,6 @@ class Portfolio(TaxableEntity):
                         taxSeries.name = self.df.index[i]
                         tax = self.totalTax(taxSeries)                           
                         income_after_saving = np.maximum(0, self.df.loc[self.df.index[i], 'taxable_ibt'] - ra_contr[i] - tax - self.uif_contr - self.df.loc[self.df.index[i], 'expenses'] - tfsa_contr[i])
-                        #print('savable income', savable_income)
-                #print('ra_frac[i]', ra_frac[i])    
-                #print('ra contr[i]', ra_contr[i])
                 
                 #  If there is only one RA, allocate to it.
                 if len(self.ra_list) == 1:
@@ -1058,27 +1103,20 @@ class Portfolio(TaxableEntity):
                 elif len(self.ra_list) > 1: #  Else allocate to max growth RA
                     contr[i, self.investment_names.index[self.max_ra_name]] = ra_frac[i]
 
-                #print(tfsa_contr[i])
                 savable_income = np.maximum(0, self.df.loc[self.df.index[i],'taxable_ibt'] - ra_contr[i] - tax - self.uif_contr - self.df.loc[self.df.index[i], 'expenses'])
-                #print('savable income year {}:'.format(self.df.index[i]), savable_income)
-                #print('tax', tax)
-                #print('ra_contr', ra_contr[i])
-                #print("self.df.loc[self.df.index[i], 'expenses']", self.df.loc[self.df.index[i], 'expenses'])
                 tfsa_frac[i] = tfsa_contr[i]/savable_income
-                #print('tfsa_frac', tfsa_frac[i])
-                #print('\n\n')
                 contr[i, self.investment_names.index(self.max_tfsa_name)] = tfsa_frac[i]
                     
-                #print('tfsa_contr', tfsa_contr[i])
-
             #  Calculate and allocate DI
             if tfsa_frac[i] < 1:
                 contr[i, self.investment_names.index(self.max_di_name)] = 1 - tfsa_frac[i]
                     
-        self.investments[self.ra_list[0]].growthBeforeRetirement(contr)
-        ra_retirement_capital = self.investments[self.ra_list[0]].df.loc[self.last_working_year, 'capital'].copy()
-        ra_payout = min(self.CGTRA_LIM1/ra_retirement_capital, ra_retirement_capital*0.3/ra_retirement_capital)
-
+        if len(self.ra_list):
+            self.investments[self.ra_list[0]].growthBeforeRetirement(contr)
+            ra_retirement_capital = self.investments[self.ra_list[0]].df.loc[self.last_working_year, 'capital'].copy()
+            ra_payout = min(self.CGTRA_LIM1/ra_retirement_capital, ra_retirement_capital*0.3/ra_retirement_capital)
+        else:
+            ra_payout = np.array([0])
         return np.insert(contr.reshape(contr.size, order='F'), 0, ra_payout)
 
     def rebalancePSO(self, swarm):
@@ -1123,20 +1161,19 @@ class Portfolio(TaxableEntity):
             #  If ras are so high (still < 1) that savable income is negative,
             #  reduce ra contributions by 1%.
             ras_sum = ras.sum(axis=1)
-            for j in range(len(ras[:, 0])):
-                savable_income = np.array([-1, -1])
+            if len(self.ra_list):
+               for j in range(len(ras[:, 0])):
+                    savable_income = np.array([-1, -1])
                 
             #  If savable_income < 0, adjust ras downwards. At the moment it
             #  adjusts all positive RAs downwards by 1%. 
-                while savable_income.any() < 0 and any(ras[j, :]) > 0:                   
-                    tax = self.incomeTax(self.df.loc[self.df.index[j],'taxable_ibt'] - ras_sum[j]*self.df.loc[self.df.index[j],'taxable_ibt'])
-                    if i <= self.number_working_years:
-                        savable_income = self.df.loc[self.df.index[j], 'taxable_ibt'] - tax - self.uif_contr - self.df.expenses - ras_sum[j]*self.df.loc[self.df.index[j], 'taxable_ibt']
-                    else:
-                        savable_income = self.df.loc[self.df.index[j], 'taxable_ibt'] - tax - self.df.expenses - ras_sum[j]*self.df.loc[self.df.index[j], 'taxable_ibt']
-                    ras[j, :] = np.maximum(0, ras[j, :] - 0.01) #  subtract 1% if ras[i, ?] > 0
-                    print(savable_income)
-                    print(ras[j, :])
+                    while savable_income.any() < 0 and any(ras[j, :]) > 0:                   
+                        tax = self.incomeTax(self.df.loc[self.df.index[j],'taxable_ibt'] - ras_sum[j]*self.df.loc[self.df.index[j],'taxable_ibt'])
+                        if i <= self.number_working_years:
+                            savable_income = self.df.loc[self.df.index[j], 'taxable_ibt'] - tax - self.uif_contr - self.df.expenses - ras_sum[j]*self.df.loc[self.df.index[j], 'taxable_ibt']
+                        else:
+                            savable_income = self.df.loc[self.df.index[j], 'taxable_ibt'] - tax - self.df.expenses - ras_sum[j]*self.df.loc[self.df.index[j], 'taxable_ibt']
+                        ras[j, :] = np.maximum(0, ras[j, :] - 0.01) #  subtract 1% if ras[i, ?] > 0
             others = ind[:, len(self.ra_list):]
             others = others/others.sum(axis=1)[:, None] # normalize
             others[others==np.inf] = 0
@@ -1201,16 +1238,29 @@ class Portfolio(TaxableEntity):
                    'w': 0.1, #  inertia
                    'k': 2, #  Number of neighbours. Ring topology seems popular
                    'p': 2}  #  Distance function (Minkowski p-norm). 1 for abs, 2 for Euclidean
-        topology = ps.backend.topology.Star()
+        topology = ps.backend.topology.Ring()
                 
         lst_init_pos = [None]*n_particles
         lst_init_pos[0] = self.randomConstantPosition(np.random.choice(factor_list)).T
-        lst_init_pos[1] = self.taxEfficientPositionRAFirst().T
-        lst_init_pos[2] = self.taxEfficientPosTFSAFirst().T
+        #  Handle cases where people don't have RAs or TFSAs:
+        if len(self.ra_list):
+            lst_init_pos[1] = self.taxEfficientPositionRAFirst().T
+
+        else:
+            lst_init_pos[1] = self.randomConstantPosition(np.random.choice(factor_list)).T
+        if len(self.tfsa_list):
+            lst_init_pos[2] = self.taxEfficientPosTFSAFirst().T
+            lst_init_pos[2] = self.randomPosition(np.random.choice(factor_list)).T
+
+        else:
+            lst_init_pos[2] = self.randomConstantPosition(np.random.choice(factor_list)).T
+        
         for i in range(3, n_particles, 2):
             lst_init_pos[i-1] = self.randomConstantPosition(np.random.choice(factor_list)).T
             lst_init_pos[i] = self.randomPosition(np.random.choice(factor_list)).T
-         
+        
+        #  Convert to numpy array. Not efficient, but gets it in the correct
+        #  format.
         init_pos = np.zeros([len(lst_init_pos), len(lst_init_pos[0])])
         for i in range(n_particles):
             init_pos[i,:] = lst_init_pos[i]        
@@ -1256,7 +1306,7 @@ class Portfolio(TaxableEntity):
             )
             # Update gbest from neighborhood
             self.myswarm.best_pos, self.myswarm.best_cost = topology.compute_gbest(self.myswarm,
-#                options['p'], options['k']
+                options['p'], options['k']
             )
             improvement[1] = improvement[0]
             improvement[0] = self.myswarm.best_cost/previous_cost - 1        
@@ -1267,8 +1317,8 @@ class Portfolio(TaxableEntity):
             self.myswarm = self.rebalancePSO(self.myswarm)
             
             previous_cost = self.myswarm.best_cost
-        print('The best cost: {:.4f}'.format(self.myswarm.best_cost))
-        print('The best position found by our swarm is: {}'.format(self.myswarm.best_pos))           
+        #print('The best cost: {:.4f}'.format(self.myswarm.best_cost))
+        #print('The best position found by our swarm is: {}'.format(self.myswarm.best_pos))           
         
         return self.myswarm.best_pos, self.myswarm.best_cost
 
@@ -1394,7 +1444,6 @@ class TFSA(TaxableEntity):
     
     def calculateOptimalWithdrawal(self,
                                    contr,
-                                   strategy='optimal',
                                    ra_payout_frac=0): #  dummy, for Portfolio calling RA.
         
         '''
@@ -1423,7 +1472,7 @@ class TFSA(TaxableEntity):
         # Determine capped contributions before optimising withdrawals
         c = self.df.loc[self.retirement_fy_end, 'capital'].copy()
         drawdown = 0.04
-        if strategy == 'optimal':
+        if self.strategy == 'optimal':
             capital_at_le = np.inf
             arr = self.df.loc[self.retirement_date:, ['capital']].values.copy()
             while capital_at_le > 0:
@@ -1432,7 +1481,7 @@ class TFSA(TaxableEntity):
                 capital_at_le = self._calculateQuick(arr, self.growth, c*drawdown)
                 #print(capital_at_le)
             drawdown -= 0.001
-        elif strategy == 'safe':
+        elif self.strategy == 'safe':
             drawdown = 0.04
         
         self.df.loc[self.retirement_fy_end:, 'withdrawals'] = drawdown*c
@@ -1490,7 +1539,6 @@ class TFSA(TaxableEntity):
         capital_calc = capital
         monthly_growth = 10**(np.log10(1 + growth)/12) - 1
 
-        #print(contributions)
         contr = contributions/installments
         withdr = withdrawals/installments
         for i in range(0, installments):
@@ -1690,7 +1738,6 @@ class RA(TaxableEntity):
         
     def calculateOptimalWithdrawal(self,
                                    contr,
-                                   strategy='optimal',
                                    payout_fraction=None):
         
         '''
@@ -1709,7 +1756,7 @@ class RA(TaxableEntity):
         '''
         
         self.growthBeforeRetirement(contr, self.payout_fraction)
-        self.growthAfterRetirementOptimalWithdrawal(contr, strategy)
+        self.growthAfterRetirementOptimalWithdrawal(contr)
 
     def calculateCapitalAnnualized(self,
                                    capital,
@@ -1790,7 +1837,6 @@ class RA(TaxableEntity):
         
     def growthAfterRetirementOptimalWithdrawal(self,
                                                contr,
-                                               strategy='optimal',
                                                ra_payout_frac=0): #  dummy, for when Portfolio calls RA.
         
         '''
@@ -1815,7 +1861,7 @@ class RA(TaxableEntity):
         
         
         withdrawals = np.zeros(self.number_retirement_years)
-        if strategy == 'optimal':
+        if self.strategy == 'optimal':
             capital_at_le = np.inf
             
             arr = self.df.loc[self.retirement_fy_end:, 'capital'].values.copy()
@@ -1863,7 +1909,7 @@ class RA(TaxableEntity):
             self.df.loc[self.retirement_fy_end, 'capital'] = capital_calc
             self.df.loc[self.first_fy_after_retirement:, 'withdrawals'] = withdrawal
 
-        elif strategy == 'safe':
+        elif self.strategy == 'safe':
             drawdown = 0.04
 
 
@@ -2118,7 +2164,6 @@ class DI(TaxableEntity):
     
     def calculateOptimalWithdrawal(self, 
                                    contr,
-                                   strategy='optimal',
                                    ra_payout_frac=0): # dummy variable for RA.
         
         '''
@@ -2135,10 +2180,9 @@ class DI(TaxableEntity):
         self.df.loc[:, 'contr'] = contr  
         self.df.loc[self.retirement_fy_end, 'contr'] = self.df.loc[self.retirement_fy_end, 'contr']*self.ret_year_installments/12
         self.df.loc[:, 'withdrawals'] = 0
-        self.strategy = strategy 
-        self.recalculateOptimalWithdrawal(strategy)
+        self.recalculateOptimalWithdrawal()
         
-    def recalculateOptimalWithdrawal(self, strategy='optimal'):
+    def recalculateOptimalWithdrawal(self):
         
         '''
         Calculates optimal withdrawal figure so that capital lasts exactly as 
@@ -2151,23 +2195,26 @@ class DI(TaxableEntity):
         
         self.calculate()
         c = self.df.loc[self.retirement_fy_end, 'capital'].copy()
+        #print('c', c)
         drawdown = 0.04
-        if strategy == 'optimal':
+        arr = np.zeros(self.number_retirement_years)
+        if self.strategy == 'optimal':
             capital_at_le = np.inf
             
             while capital_at_le > 0:
-                arr = self.df.loc[self.retirement_fy_end:, 'capital'].values - c*drawdown
-                arr[0] = self.df.loc[self.retirement_fy_end, 'capital'] - (12 - self.ret_year_installments)/12*c*drawdown
+                arr[0] = self.df.loc[self.retirement_fy_end, 'capital']
+                arr[1:] = self.df.loc[self.first_fy_after_retirement:, 'capital'].values - c*drawdown
                 drawdown += 0.001
                 capital_at_le = self._calculateQuick(arr,
                                                      self.growth,
                                                      drawdown*c)
-
             drawdown -= 0.001
             self.drawdown = drawdown
-        elif strategy == 'safe':
+            #print('capital_at_le', capital_at_le)
+        elif self.strategy == 'safe':
             drawdown = 0.04
 
+        #print('drawdown', drawdown)
         self.df.loc[self.retirement_fy_end:, 'withdrawals'] = drawdown*c
         self.df.loc[self.retirement_fy_end, 'withdrawals'] = (12 - self.ret_year_installments)/12*c*drawdown
         self.calculate()
