@@ -551,7 +551,7 @@ class Portfolio(TaxableEntity):
         pos = swarm.position
         
         for i in range(pos.shape[0]):
-            self.pso_objective(pos[i, :])        
+            results[i] = self.pso_objective(pos[i, :])        
         return results
     
     def pso_objective(self, pos):
@@ -1220,9 +1220,7 @@ class Portfolio(TaxableEntity):
                 index += 1           
                 
         #  No bounds on withdrawals because we do not guess withdrawals. They are
-        #  calculated.
-        bounds = (min_bounds, max_bounds)
-        self.bounds = bounds        
+        #  calculated.    
         
         n_particles = int(max(20, len(self.investment_names)*self.number_working_years/4))
         if n_particles%2 != 0:
@@ -1232,13 +1230,13 @@ class Portfolio(TaxableEntity):
         #iterations = 10
         tolerance = 1e-2 #  Stopping criterion: improvement per iteration
         print_interval = 1   
-        options = {'c1': 2, #  cognitive parameter (weight of personal best)
-                   'c2': 2, #  social parameter (weight of swarm best)
+        options = {'c1': 1, #  cognitive parameter (weight of personal best)
+                   'c2': 1, #  social parameter (weight of swarm best)
                    'v': 0, #  initial velocity
                    'w': 0.1, #  inertia
                    'k': 2, #  Number of neighbours. Ring topology seems popular
                    'p': 2}  #  Distance function (Minkowski p-norm). 1 for abs, 2 for Euclidean
-        topology = ps.backend.topology.Ring()
+        topology = ps.backend.topology.Star()
                 
         lst_init_pos = [None]*n_particles
         lst_init_pos[0] = self.randomConstantPosition(np.random.choice(factor_list)).T
@@ -1248,9 +1246,9 @@ class Portfolio(TaxableEntity):
 
         else:
             lst_init_pos[1] = self.randomConstantPosition(np.random.choice(factor_list)).T
+
         if len(self.tfsa_list):
             lst_init_pos[2] = self.taxEfficientPosTFSAFirst().T
-            lst_init_pos[2] = self.randomPosition(np.random.choice(factor_list)).T
 
         else:
             lst_init_pos[2] = self.randomConstantPosition(np.random.choice(factor_list)).T
@@ -1284,14 +1282,14 @@ class Portfolio(TaxableEntity):
                      options=options,
                      dimensions=dimensions,
                      #bounds=bounds,
-                     #clamp=(-0.2, 0.2)
+                     clamp=(-0.2, 0.2)
                      )
         
-        improvement = [100, 100]
+        improvement = [100, 100, 100]
         previous_cost = -1
         counter = 0
-        #for i in range(iterations):
-        while sum(improvement) > tolerance:
+                                
+        while sum(np.abs(improvement))/len(improvement) > tolerance:
             counter += 1
             max_iter = max(50, counter)
             #  Update personal bests
@@ -1305,20 +1303,52 @@ class Portfolio(TaxableEntity):
                 self.myswarm
             )
             # Update gbest from neighborhood
-            self.myswarm.best_pos, self.myswarm.best_cost = topology.compute_gbest(self.myswarm,
-                options['p'], options['k']
-            )
-            improvement[1] = improvement[0]
-            improvement[0] = self.myswarm.best_cost/previous_cost - 1        
+            self.myswarm.best_pos, self.myswarm.best_cost = topology.compute_gbest(self.myswarm)#,
+                #options['p'], options['k'])
+            
+            improvement[1:] = improvement[0:2]
+            #improvement[0] = self.myswarm.best_cost - previous_cost
+            improvement[0] = self.myswarm.best_cost/previous_cost - 1     
             if i%print_interval==0:
-                print('Iteration: {} | best cost: {:.0f} | Improvement: {:2f}'.format(counter, self.myswarm.best_cost, improvement[0]))
+                print('Iteration: {} | best cost: {:.3f} | Improvement: {:2f}'.format(counter, self.myswarm.best_cost, improvement[0]))
             self.myswarm.velocity = topology.compute_velocity(self.myswarm)
             self.myswarm.position = topology.compute_position(self.myswarm)
             self.myswarm = self.rebalancePSO(self.myswarm)
             
-            previous_cost = self.myswarm.best_cost
-        #print('The best cost: {:.4f}'.format(self.myswarm.best_cost))
-        #print('The best position found by our swarm is: {}'.format(self.myswarm.best_pos))           
+            previous_cost = self.myswarm.best_cost    
+
+        topology = ps.backend.topology.Star()
+        improvement[-1] = tolerance
+        self.myswarm.options['k'] = n_particles
+        print('MOVING TO STAR TOPOLOGY')
+        while improvement[-1] > tolerance:
+            counter += 1
+            max_iter = max(50, counter)
+            #  Update personal bests
+            # Compute cost for current position and personal best
+            self.myswarm.current_cost = self.pso_objectiveSwarm(self.myswarm)
+            pbest_cost = np.zeros(n_particles)
+            for i in range(n_particles):
+                pbest_cost[i] = self.pso_objective(self.myswarm.pbest_pos[i,:])
+            self.myswarm.pbest_cost = pbest_cost
+            self.myswarm.pbest_pos, self.myswarm.pbest_cost = ps.backend.operators.compute_pbest(
+                self.myswarm
+            )
+            # Update gbest from neighborhood
+            self.myswarm.best_pos, self.myswarm.best_cost = topology.compute_gbest(self.myswarm)#,
+                #options['p'], options['k'])
+            
+            improvement[1:] = improvement[0:2]
+            #improvement[0] = self.myswarm.best_cost - previous_cost
+            improvement[0] = self.myswarm.best_cost/previous_cost - 1     
+            if i%print_interval==0:
+                print('Iteration: {} | best cost: {:.3f} | Improvement: {:2f}'.format(counter, self.myswarm.best_cost, improvement[0]))
+            self.myswarm.velocity = topology.compute_velocity(self.myswarm)
+            self.myswarm.position = topology.compute_position(self.myswarm)
+            self.myswarm = self.rebalancePSO(self.myswarm)
+            
+            previous_cost = self.myswarm.best_cost    
+
         
         return self.myswarm.best_pos, self.myswarm.best_cost
 
