@@ -342,6 +342,11 @@ class Portfolio(TaxableEntity):
         '''
         
         def solutions():
+            
+            '''
+            This function determines the solutions to the PSO, TFSA, and RA
+            plans
+            '''
         
             time1 = time.time()
             #import scipy.optimize as spm
@@ -367,6 +372,13 @@ class Portfolio(TaxableEntity):
             return pso_plan, tfsa_priority_plan, ra_priority_plan            
 
         def determineOptimalPlan(plan_tup):
+            
+            '''
+            This function evaluates the solutions from the PSO, TFSA, and RA
+            plans, and selects the best one. It also assigns the best plan to
+            the object's dataframe and plots the solution.
+            '''
+            
             pso_plan, tfsa_priority_plan, ra_priority_plan = plan_tup[0], plan_tup[1], plan_tup[2]
             if pso_plan > ra_priority_plan and pso_plan > tfsa_priority_plan:
                 best_plan = pso_plan
@@ -423,6 +435,41 @@ class Portfolio(TaxableEntity):
                   post-retirement income after tax by  {round((best_plan_reduced/best_plan - 1), 2)*100}%''')
         else:
             best_plan = determineOptimalPlan(solutions())
+
+
+    def optimizeParams(self, params):
+        
+        '''
+        Optimizes the investment allocations of the portfolio over time by using
+        a Particle Swarm Optimization algorithm.
+        
+        This function contains two subfunctions: solutions, and determineOptimalSolution.
+        This was done to decrease code repetition.
+        '''
+  
+   
+        time1 = time.time()
+        #import scipy.optimize as spm
+        tfsa_priority_plan = self.calculateTaxEfficientTFSAFirstIAT()
+        ra_priority_plan = self.calculateTaxEfficientRAFirstIAT()
+
+          
+        self.contr = pd.DataFrame(index=self.df.index,
+                                     columns=self.investment_names)
+
+            
+        best_ind, cost = self.pso(params)
+        print('Duration:', (time.time() - time1)/60, 'min')
+        self.best_ind = best_ind
+        solution, ra_payouts = self.fractionsToRands(self.reshape(best_ind)) 
+        self.solution = solution
+        for count, key in enumerate(self.investment_names):
+            self.contr.loc[:, key] = solution[:, count]
+            self.investments[key].calculateOptimalWithdrawal(self.contr[key], self.strategy)
+            
+        self.calculate()
+        pso_plan = round(self.df.loc[self.retirement_fy_end:, 'iat'].mean()/12, 2)       
+        return -pso_plan
 
     #@numba.jit
     def reshape(self, pos):
@@ -1186,15 +1233,15 @@ class Portfolio(TaxableEntity):
         swarm.position = pos
         return swarm
  
-    def pso(self):
+    def pso(self, params=[]):
         
         '''
         Uses Particle Swarm Optimization to find optimal investment strategy.
         '''      
 
-        #  Create bounds. Contributions only during working months, withdrawals only during retirement
-        min_bounds = np.zeros(1 + self.size*(self.number_working_years + self.number_retirement_years))
-        max_bounds = np.zeros(1 + self.size*(self.number_working_years + self.number_retirement_years))
+        #  Create bounds. Contributions only during working years, withdrawals only during retirement
+        #min_bounds = np.zeros(1 + self.size*(self.number_working_years + self.number_retirement_years))
+        #max_bounds = np.zeros(1 + self.size*(self.number_working_years + self.number_retirement_years))
         #tax = self.incomeTax(self.df.loc[:, 'taxable_ibt'], age=self.df.loc[:, 'age'])
         #savable_income = self.df.loc[:,'taxable_ibt'] - tax - self.uif_contr - self.df.expenses    
         #  Find all columns in the dataframe containing 'capital'. This will be
@@ -1203,39 +1250,61 @@ class Portfolio(TaxableEntity):
         capital_cols.remove('capital_gains')
         #max_withdrawal = self.df.loc[self.retirement_fy_end, capital_cols].max()
         #  bounds on lump sum withdrawal:
-        min_bounds[0] = 0
-        max_bounds[0] = 0.3
+        #min_bounds[0] = 0
+        #max_bounds[0] = 0.3
         #  bounds on contributions:
-        index = 1 #  index for persistence over multiple loops
-        for i in range(self.size): 
+        index = 0 #  index for persistence over multiple loops
             #  up to savable income during working years
-            for j in range(self.number_working_years):
-                min_bounds[index] = 0
-                max_bounds[index] = 1 #savable_income
-                index += 1
-            #  No contributions during retirement
-            for j in range(self.number_retirement_years):
-                min_bounds[index] = 0
-                max_bounds[index] = 1e-5
-                index += 1           
+            
+        #        for j in range(self.number_working_years):
+        #            for i in range(self.size): 
+        #                min_bounds[index] = 0
+        #                max_bounds[index] = 1 #savable_income
+        #                index += 1
+        #            #  No contributions during retirement
+        #
+        #        for j in range(self.number_retirement_years):
+        #            for i in range(self.size): 
+        #                min_bounds[index] = 0
+        #                max_bounds[index] = 1e-5
+        #                index += 1           
                 
+        min_bounds = np.zeros([self.number_working_years + self.number_retirement_years, self.size])
+        min_bounds = np.concatenate([np.zeros(len(self.ra_list)), min_bounds.reshape(min_bounds.size,  order='F')])
+        max_bounds = np.ones([self.number_working_years + self.number_retirement_years, self.size])
+        max_bounds[self.number_working_years:,:] = 1e-5
+        max_bounds = np.concatenate([0.3*np.ones(len(self.ra_list)), max_bounds.reshape(max_bounds.size, order='F')])
+        
+        
         #  No bounds on withdrawals because we do not guess withdrawals. They are
         #  calculated.    
-        
+        self.min_bounds = min_bounds
+        self.max_bounds = max_bounds
         n_particles = int(max(20, len(self.investment_names)*self.number_working_years/4))
         if n_particles%2 != 0:
             n_particles += 1
         dimensions = min_bounds.size
         factor_list = np.geomspace(1/20, 100, 30)
         #iterations = 10
-        tolerance = 1e-2 #  Stopping criterion: improvement per iteration
-        print_interval = 1   
-        options = {'c1': 1, #  cognitive parameter (weight of personal best)
-                   'c2': 1, #  social parameter (weight of swarm best)
-                   'v': 0, #  initial velocity
-                   'w': 0.1, #  inertia
-                   'k': 2, #  Number of neighbours. Ring topology seems popular
-                   'p': 2}  #  Distance function (Minkowski p-norm). 1 for abs, 2 for Euclidean
+        tolerance = 2.5e-3 #  Stopping criterion: improvement per iteration
+        print_interval = 1 
+        options = {}
+        clamp = (-0.5, 0.2)
+        if not len(params):
+            options = {'c1': 1.680603393245492, #  cognitive parameter (weight of personal best)
+                       'c2': 1.8521484727363389, #  social parameter (weight of swarm best)
+                       'v': 0.6191471730049908, #  initial velocity
+                       'w': 0.4133545009700662, #  inertia
+                       'k': 9, #  Number of neighbours. Ring topology seems popular
+                       'p': 2}  #  Distance function (Minkowski p-norm). 1 for abs, 2 for Euclidean
+        else:
+            options = {'c1': params[0], #  cognitive parameter (weight of personal best)
+                       'c2': params[1], #  social parameter (weight of swarm best)
+                       'v': params[2], #  initial velocity
+                       'w': params[3], #  inertia
+                       'k': params[4], #  Number of neighbours. Ring topology seems popular
+                       'p': params[5]}  #  Distance function (Minkowski p-norm). 1 for abs, 2 for Euclidean
+            clamp = (-params[6], params[7])
         topology = ps.backend.topology.Star()
                 
         lst_init_pos = [None]*n_particles
@@ -1276,41 +1345,50 @@ class Portfolio(TaxableEntity):
             else:
                 print('Individual {} smaller than min bounds'.format(i))
                 print((ind >= min_bounds))
-              
         self.myswarm = ps.backend.generators.create_swarm(n_particles,
                      init_pos=init_pos,
+                     #bounds=(min_bounds, max_bounds),
                      options=options,
                      dimensions=dimensions,
-                     #bounds=bounds,
-                     clamp=(-0.2, 0.2)
+                     clamp=clamp
                      )
         
-        improvement = [100, 100, 100]
+        #improvement = [100, 100, 100]
+        improvement = 100
         previous_cost = -1
         counter = 0
-                                
-        while sum(np.abs(improvement))/len(improvement) > tolerance:
+        pbest_cost = np.zeros(n_particles)
+        while improvement > tolerance:
+
             counter += 1
             max_iter = max(50, counter)
             #  Update personal bests
             # Compute cost for current position and personal best
             self.myswarm.current_cost = self.pso_objectiveSwarm(self.myswarm)
-            pbest_cost = np.zeros(n_particles)
+            for i, pos in enumerate(self.myswarm.position):
+                if (pos >= self.max_bounds).any():
+                    indices = pos <= self.max_bounds
+                    pos[indices] = self.max_bounds[indices]
+                    self.myswarm.position[i] = pos
+                    self.myswarm.current_cost[i] = self.pso_objective(pos)
+                    self.myswarm.velocity[i][indices] = 0
             for i in range(n_particles):
                 pbest_cost[i] = self.pso_objective(self.myswarm.pbest_pos[i,:])
+
             self.myswarm.pbest_cost = pbest_cost
             self.myswarm.pbest_pos, self.myswarm.pbest_cost = ps.backend.operators.compute_pbest(
-                self.myswarm
-            )
+                self.myswarm)
+            self.myswarm.current_cost = self.pso_objectiveSwarm(self.myswarm)
+            pbest_cost = np.zeros(n_particles)                    
             # Update gbest from neighborhood
             self.myswarm.best_pos, self.myswarm.best_cost = topology.compute_gbest(self.myswarm)#,
                 #options['p'], options['k'])
             
-            improvement[1:] = improvement[0:2]
+            #improvement[1:] = improvement[0:2]
             #improvement[0] = self.myswarm.best_cost - previous_cost
-            improvement[0] = self.myswarm.best_cost/previous_cost - 1     
+            improvement = self.myswarm.best_cost/previous_cost - 1     
             if i%print_interval==0:
-                print('Iteration: {} | best cost: {:.3f} | Improvement: {:2f}'.format(counter, self.myswarm.best_cost, improvement[0]))
+                print('Iteration: {} | best cost: {:.3f} | Improvement: {:2f}'.format(counter, self.myswarm.best_cost, improvement))
             self.myswarm.velocity = topology.compute_velocity(self.myswarm)
             self.myswarm.position = topology.compute_position(self.myswarm)
             self.myswarm = self.rebalancePSO(self.myswarm)
@@ -1318,10 +1396,10 @@ class Portfolio(TaxableEntity):
             previous_cost = self.myswarm.best_cost    
 
         topology = ps.backend.topology.Star()
-        improvement[-1] = tolerance
+        improvement = 100
         self.myswarm.options['k'] = n_particles
         print('MOVING TO STAR TOPOLOGY')
-        while improvement[-1] > tolerance:
+        while improvement > tolerance:
             counter += 1
             max_iter = max(50, counter)
             #  Update personal bests
@@ -1338,11 +1416,11 @@ class Portfolio(TaxableEntity):
             self.myswarm.best_pos, self.myswarm.best_cost = topology.compute_gbest(self.myswarm)#,
                 #options['p'], options['k'])
             
-            improvement[1:] = improvement[0:2]
+            #improvement[1:] = improvement[0:2]
             #improvement[0] = self.myswarm.best_cost - previous_cost
-            improvement[0] = self.myswarm.best_cost/previous_cost - 1     
+            improvement = self.myswarm.best_cost/previous_cost - 1     
             if i%print_interval==0:
-                print('Iteration: {} | best cost: {:.3f} | Improvement: {:2f}'.format(counter, self.myswarm.best_cost, improvement[0]))
+                print('Iteration: {} | best cost: {:.3f} | Improvement: {:2f}'.format(counter, self.myswarm.best_cost, improvement))
             self.myswarm.velocity = topology.compute_velocity(self.myswarm)
             self.myswarm.position = topology.compute_position(self.myswarm)
             self.myswarm = self.rebalancePSO(self.myswarm)

@@ -89,6 +89,26 @@ print('Mean IAT, current contributions: R', round(df_p.loc[p.retirement_fy_end:,
 p.optimize(reduced_expenses=True)
 df_p = p.df
 print('Average monthly IAT during retirement:', round(p.df.loc[p.retirement_fy_end:, 'iat'].mean()/12))
+#%% Hyperparameter optimization
+
+from skopt import gp_minimize
+params = [[0.0, 2.0], #  cognitive parameter (weight of personal best)
+           [0.0, 2.0], #  social parameter (weight of swarm best)
+           [0.0, 1.0], #  initial velocity
+           [0.0, 2.0], #  inertia
+           [0, 10], 
+           [1, 2],#  Distance function (Minkowski p-norm). 1 for abs, 2 for Euclidean
+           [-1.0, 0.0],
+           [0.0, 1.0]]  
+
+res = gp_minimize(p.optimizeParams,
+                  params,
+                  acq_func="EI",      # the acquisition function
+                  n_calls=100,         # the number of evaluations of f 
+                  n_random_starts=4, # the number of random initialization points
+                  verbose=True,
+                  n_jobs=1)  
+
 #%%
 '''
 for count, i in enumerate(self.investments.keys()):
